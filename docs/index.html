@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SONOMIN · Monitoreo de ruido en minería</title>
+<meta name="description" content="Tablero en tiempo real de monitoreo de ruido ocupacional y ambiental en minería. FIM - UNA Puno.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="img/logo_una.png">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+
+<!-- ============================================================ acceso -->
+<section id="pantalla-login" hidden>
+  <div class="login">
+    <div class="tarjeta">
+      <div class="logos" style="margin-bottom:12px"><img src="img/logo_una.png" alt="UNA Puno" height="46" style="background:#fff;border-radius:8px;padding:3px"><img src="img/fim_logo.png" alt="FIM" height="46" style="background:#fff;border-radius:8px;padding:3px"></div>
+      <h1 style="font-size:22px">SONOMIN</h1>
+      <p class="mudo">Monitoreo de ruido en minería · Facultad de Ingeniería de Minas, UNA Puno</p>
+      <form id="form-login" autocomplete="on">
+        <label class="campo"><span>Correo</span><input id="login-correo" type="email" autocomplete="username" required></label>
+        <label class="campo"><span>Contraseña</span><input id="login-clave" type="password" autocomplete="current-password" required></label>
+        <div class="error" id="login-error" role="alert"></div>
+        <button class="boton" type="submit">Entrar</button>
+        <p class="mudo" style="font-size:13px;margin:0">¿No tiene cuenta? <button type="button" class="enlace" id="ir-registro">Solicitar acceso</button></p>
+      </form>
+      <form id="form-registro" autocomplete="on" hidden>
+        <p style="margin:0;font-size:14px">Cree su cuenta. El administrador revisará su solicitud y le dará acceso.</p>
+        <label class="campo"><span>Nombre y cargo</span><input id="reg-nombre" type="text" autocomplete="name" required maxlength="80" placeholder="Ej. Ing. Juan Pérez, supervisor SSOMA"></label>
+        <label class="campo"><span>Correo</span><input id="reg-correo" type="email" autocomplete="email" required></label>
+        <label class="campo"><span>Contraseña (mínimo 8 caracteres)</span><input id="reg-clave" type="password" autocomplete="new-password" required minlength="8"></label>
+        <label class="campo"><span>Repita la contraseña</span><input id="reg-clave2" type="password" autocomplete="new-password" required minlength="8"></label>
+        <label class="campo"><span>¿Para qué necesita el acceso? (opcional)</span><input id="reg-motivo" type="text" maxlength="160"></label>
+        <div class="error" id="registro-error" role="alert"></div>
+        <div class="caja-aviso ok" id="registro-ok" hidden></div>
+        <button class="boton" type="submit">Enviar solicitud</button>
+        <p class="mudo" style="font-size:13px;margin:0">¿Ya tiene cuenta? <button type="button" class="enlace" id="ir-login">Entrar</button></p>
+      </form>
+      <p class="mudo" style="margin-top:14px;font-size:12px">Acceso solo para personas autorizadas por el administrador del monitoreo.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ aplicacion -->
+<div id="app" hidden>
+  <div id="aviso-demo" class="aviso-demo" hidden>MODO DEMOSTRACIÓN · los datos que ve son sintéticos, generados para probar el tablero. No son mediciones reales.</div>
+  <header class="cabecera">
+    <div class="cabecera-fila">
+      <div class="logos"><img src="img/logo_una.png" alt="UNA Puno"><img src="img/fim_logo.png" alt="FIM"></div>
+      <div class="titulo-app"><strong>SONOMIN</strong><span>Monitoreo de ruido en minería · FIM - UNA Puno</span></div>
+      <div class="estado" aria-live="polite"><span id="punto-estado" class="punto-estado"></span><span id="texto-estado">Conectando…</span></div>
+      <span class="usuario-actual" id="usuario-actual"></span>
+      <button class="boton-cab" id="boton-alertas" type="button" title="Sonido y notificación cuando una medición llegue a 85 dB(A) o supere el ECA">Alertas</button>
+      <button class="boton-cab" id="boton-tema" type="button" title="Cambiar entre tema claro y oscuro">Tema</button>
+      <button class="boton-cab" id="boton-salir" type="button">Salir</button>
+    </div>
+  </header>
+
+  <nav class="pestanas" aria-label="Secciones">
+    <div class="pestanas-fila" role="tablist">
+      <button class="pestana" role="tab" data-vista="vivo" aria-selected="true">En vivo</button>
+      <button class="pestana" role="tab" data-vista="mapa" aria-selected="false">Mapa</button>
+      <button class="pestana" role="tab" data-vista="proyectos" aria-selected="false">Proyectos</button>
+      <button class="pestana" role="tab" data-vista="mediciones" aria-selected="false">Mediciones</button>
+      <button class="pestana" role="tab" data-vista="analisis" aria-selected="false">Análisis</button>
+      <button class="pestana" role="tab" data-vista="estadistica" aria-selected="false">Estadística</button>
+      <button class="pestana" role="tab" data-vista="pronostico" aria-selected="false">Pronóstico</button>
+      <button class="pestana" role="tab" data-vista="penalidades" aria-selected="false">Penalidades</button>
+      <button class="pestana" role="tab" data-vista="informes" aria-selected="false">Informes</button>
+      <button class="pestana" role="tab" data-vista="accesos" aria-selected="false" data-solo="admin" hidden>Accesos</button>
+    </div>
+  </nav>
+
+  <div class="filtros">
+    <div class="filtros-fila">
+      <label class="campo"><span>Proyecto</span><select id="f-proyecto"></select></label>
+      <div class="campo"><span>Periodo</span>
+        <div class="grupo-botones" id="f-periodo">
+          <button type="button" data-dias="1" aria-pressed="false">Hoy</button>
+          <button type="button" data-dias="7" aria-pressed="false">7 días</button>
+          <button type="button" data-dias="30" aria-pressed="false">30 días</button>
+          <button type="button" data-dias="0" aria-pressed="true">Todo</button>
+        </div>
+      </div>
+      <label class="campo"><span>Ámbito</span>
+        <select id="f-ambito"><option value="">Superficie e interior</option><option value="SUPERFICIE">Superficie</option><option value="INTERIOR">Interior mina</option></select>
+      </label>
+      <label class="campo"><span>Modo de medición</span>
+        <select id="f-modo"><option value="">Todos</option><option value="PUNTUAL">Punto fijo</option><option value="RECORRIDO">Recorrido</option><option value="JORNADA">Jornada</option><option value="CONTINUO">Monitoreo continuo</option></select>
+      </label>
+      <span class="mudo" id="f-resumen" style="margin-left:auto;font-size:13px"></span>
+    </div>
+  </div>
+
+  <main>
+    <section class="vista" id="vista-vivo"></section>
+    <section class="vista" id="vista-mapa" hidden></section>
+    <section class="vista" id="vista-proyectos" hidden></section>
+    <section class="vista" id="vista-mediciones" hidden></section>
+    <section class="vista" id="vista-analisis" hidden></section>
+    <section class="vista" id="vista-estadistica" hidden></section>
+    <section class="vista" id="vista-pronostico" hidden></section>
+    <section class="vista" id="vista-penalidades" hidden></section>
+    <section class="vista" id="vista-informes" hidden></section>
+    <section class="vista" id="vista-accesos" hidden></section>
+  </main>
+
+  <footer class="pie">
+    SONOMIN · idea y dirección: Ing. Lesmes Gabriel Calsina Paricahua · desarrollo: Felix Fernando Bautista Layme · FIM - UNA Puno.
+    Normas: D.S. 024-2016-EM (Anexo 12 y Guía N° 1) y D.S. 085-2003-PCM. Las estimaciones de multas son referenciales y no sustituyen el análisis legal.
+    Mapa: imágenes © Esri, Maxar, Earthstar Geographics; calles © colaboradores de OpenStreetMap.
+  </footer>
+</div>
+
+<dialog id="dialogo"><div class="dialogo-cab"><h2 id="dialogo-titulo"></h2><button class="boton sec" type="button" id="dialogo-cerrar">Cerrar</button></div><div class="dialogo-cuerpo" id="dialogo-cuerpo"></div></dialog>
+<div class="avisos" id="avisos" aria-live="polite"></div>
+<dialog id="visor" class="visor"><img id="visor-img" alt="Foto de evidencia ampliada"></dialog>
+
+<script src="vendor/supabase.js"></script>
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="config.js"></script>
+<script src="js/normas.js"></script>
+<script src="js/analisis.js"></script>
+<script src="js/penalidades.js"></script>
+<script src="js/graficos.js"></script>
+<script src="js/demo.js"></script>
+<script src="js/datos.js"></script>
+<script src="js/util.js"></script>
+<script src="js/vistas/vivo.js"></script>
+<script src="js/vistas/mapa.js"></script>
+<script src="js/vistas/proyectos.js"></script>
+<script src="js/vistas/mediciones.js"></script>
+<script src="js/vistas/analisis.js"></script>
+<script src="js/vistas/estadistica.js"></script>
+<script src="js/vistas/pronostico.js"></script>
+<script src="js/vistas/penalidades.js"></script>
+<script src="js/vistas/informes.js"></script>
+<script src="js/vistas/accesos.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

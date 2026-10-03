@@ -1,0 +1,39 @@
+name: Informe SONOMIN
+# Cada 6 horas genera el informe con los datos de la nube. Ademas, esta actividad
+# evita que Supabase (plan gratis) pause el proyecto por inactividad.
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      proyecto:
+        description: "Solo este proyecto (dejar vacio para todos)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  informe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: procesamiento/requirements.txt
+      - run: pip install -r procesamiento/requirements.txt
+      - name: Generar y subir informe
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          PROYECTO: ${{ github.event.inputs.proyecto }}
+        run: |
+          if [ -n "$PROYECTO" ]; then
+            python procesamiento/nube_informes.py --proyecto "$PROYECTO"
+          else
+            python procesamiento/nube_informes.py
+          fi
