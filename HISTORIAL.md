@@ -6,6 +6,11 @@ Cada versión anota qué se hizo, por qué y qué quedó pendiente. Las fechas s
 
 ---
 
+## v4.0.1 · 4 de octubre · ajustes tras la prueba en la nube
+
+- El ingreso al tablero se registra después de conectar el tiempo real, y la pestaña Registro recarga la auditoría cada vez que se abre (antes un ingreso podía no aparecer en pantalla hasta recargar).
+- Verificado en la nube real: papelera, borrado definitivo y su constancia en la auditoría; informe automático de GitHub en verde con los dos secretos.
+
 ## v4.0 · 4 de octubre · registro de todo, papelera e informe al instante
 
 **Por qué:** el informe automático de GitHub fallaba y no había forma de corregir una medición hecha por error; además se pidió que todo lo que se haga quede registrado.
