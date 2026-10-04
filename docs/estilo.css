@@ -1,4 +1,4 @@
-[hidden] { display: none !important; }/* SONOMIN · tablero en la nube */
+/* SONOMIN · tablero en la nube */
 :root {
   color-scheme: light;
   --fondo: #f3f5f4;
@@ -345,3 +345,58 @@ dialog.visor img { width: 100%; display: block; }
 .calor td { width: 30px; height: 24px; border-radius: 3px; font-variant-numeric: tabular-nums; }
 .calor th { color: var(--mudo); font-weight: 600; padding: 0 4px; }
 .cifra-test { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+
+/* un formulario oculto no debe mostrarse aunque .login form defina display:flex */
+[hidden] { display: none !important; }
+.caja-borde { border: 1px solid var(--borde); border-radius: 8px; padding: 10px 12px; }
+.caja-borde > summary { cursor: pointer; font-weight: 600; color: var(--grave-texto); }
+.etq-aud { font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 4px; border: 1px solid var(--borde); color: var(--tinta-2); white-space: nowrap; }
+.etq-aud.ingresos { color: var(--serie-1); border-color: var(--serie-1); }
+.etq-aud.mediciones { color: var(--grave-texto); border-color: var(--grave); }
+.etq-aud.accesos { color: var(--aviso-texto); border-color: var(--aviso); }
+.etq-aud.informes, .etq-aud.proyectos { color: var(--ok-texto); border-color: var(--ok); }
+tr.fila-nueva td { animation: resalte 2.5s ease-out; }
+
+/* ================================================== informe tecnico (vista previa e impresion) */
+#informe-capa { position: fixed; inset: 0; z-index: 3000; background: #5f6368; overflow-y: auto; }
+.informe-barra { position: sticky; top: 0; z-index: 2; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: space-between; background: var(--superficie); color: var(--tinta); padding: 10px 16px; border-bottom: 1px solid var(--borde); }
+.inf-estado { font-size: 13px; color: var(--mudo); }
+.informe-hoja { max-width: 210mm; margin: 18px auto 40px; background: #fff; box-shadow: 0 2px 14px rgba(0,0,0,.35); padding: 16mm 15mm; }
+.informe { color: #111; font: 11pt/1.45 "Segoe UI", Arial, Helvetica, sans-serif; }
+.informe p { margin: 0 0 6pt; text-align: justify; }
+.inf-cab { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; border-bottom: 2px solid #0c2d5c; padding-bottom: 8px; }
+.inf-logos { display: flex; gap: 6px; } .inf-logos img { height: 58px; width: auto; }
+.inf-inst { font-size: 9.5pt; color: #0c2d5c; font-weight: 600; line-height: 1.35; }
+.inf-codigo { font-size: 9pt; text-align: right; color: #333; }
+.inf-titulo { font-size: 17pt; text-align: center; margin: 14pt 0 2pt; color: #0c2d5c; letter-spacing: .5px; }
+.inf-subtitulo { text-align: center !important; font-size: 12pt; margin-bottom: 10pt !important; color: #333; }
+.inf-seccion { margin-top: 14pt; }
+.inf-seccion h2 { font-size: 12.5pt; color: #0c2d5c; border-bottom: 1px solid #0c2d5c; padding-bottom: 2pt; margin: 0 0 6pt; }
+.inf-tabla { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin: 4pt 0 8pt; }
+.inf-tabla th { background: none; color: #111; position: static; text-align: left; border-top: 1.5px solid #111; border-bottom: 1px solid #111; padding: 3pt 5pt; white-space: normal; }
+.inf-tabla td { border-bottom: .5px solid #bdbdbd; padding: 3pt 5pt; vertical-align: top; }
+.inf-tabla tr:last-child td { border-bottom: 1.5px solid #111; }
+.inf-tabla .num { text-align: right; font-variant-numeric: tabular-nums; }
+.inf-figura { margin: 6pt 0 10pt; } .inf-figura svg { display: block; max-width: 100%; height: auto; }
+.inf-figura figcaption, .inf-fotos figcaption { font-size: 9pt; color: #333; margin-top: 3pt; }
+.inf-nota { font-size: 9pt !important; color: #444; }
+.inf-lista { margin: 0; padding-left: 18pt; } .inf-lista li { margin-bottom: 4pt; text-align: justify; }
+.inf-fotos { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; }
+.inf-fotos figure { margin: 0; break-inside: avoid; }
+.inf-foto-caja img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border: .5px solid #999; display: block; }
+.inf-sin-foto { aspect-ratio: 4 / 3; border: .5px dashed #999; display: flex; align-items: center; justify-content: center; font-size: 9pt; color: #666; }
+.inf-firmas { display: grid; grid-template-columns: 1fr 1fr; gap: 40pt; margin-top: 46pt; text-align: center; break-inside: avoid; }
+.inf-linea { border-top: 1px solid #111; margin-bottom: 4pt; }
+.inf-pie { margin-top: 14pt !important; border-top: .5px solid #999; padding-top: 4pt; }
+@media screen and (max-width: 800px) { .informe-hoja { padding: 8mm 6mm; margin: 8px; } .inf-cab { grid-template-columns: 1fr; } .inf-codigo { text-align: left; } .inf-fotos { grid-template-columns: 1fr; } }
+@media print {
+  @page { size: A4; margin: 14mm 13mm 14mm 13mm; }
+  body.imprimiendo-informe > *:not(#informe-capa) { display: none !important; }
+  body.imprimiendo-informe { background: #fff !important; }
+  body.imprimiendo-informe #informe-capa { position: static; background: #fff; overflow: visible; }
+  body.imprimiendo-informe .informe-barra { display: none !important; }
+  body.imprimiendo-informe .informe-hoja { box-shadow: none; margin: 0; padding: 0; max-width: none; }
+  .inf-seccion h2 { break-after: avoid; }
+  .inf-tabla tr, .inf-figura { break-inside: avoid; }
+  .inf-anexo { break-before: page; }
+}

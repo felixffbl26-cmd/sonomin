@@ -117,3 +117,9 @@ test("UTM a geograficas contra pyproj (EPSG:32719 y 32718)", () => {
   assert.ok(m.latDesdeUtm); cerca(m.lat, -15.8445496, 1e-6);
   assert.strictEqual(A.normalizar({ latitud: -15.1, longitud: -70.1 }).lat, -15.1);
 });
+test("Excel: zip valido (CRC-32 estandar y firma PK)", () => {
+  const X = require("../docs/js/xlsx.js");
+  assert.strictEqual(X.crc32(new TextEncoder().encode("123456789")).toString(16), "cbf43926");
+  const b = X.crear([{ nombre: "A", columnas: ["x"], filas: [[1], ["ñ"]] }]);
+  assert.strictEqual(b[0], 0x50); assert.strictEqual(b[1], 0x4b);
+});

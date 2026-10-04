@@ -4,6 +4,32 @@ Idea y dirección: Ing. Lesmes Gabriel Calsina Paricahua · Desarrollo: Felix Fe
 
 Con esta carpeta el tablero de la computadora queda en un **enlace de internet**. El ingeniero, su jefe o quien usted autorice entra con correo y contraseña y ve, en tiempo real, las mediciones, las fotos, el análisis, los pronósticos y el cálculo de penalidades.
 
+## Ya está publicado (3 de octubre de 2026)
+
+| Qué | Dónde |
+|---|---|
+| **Tablero en internet** (el enlace para su jefe) | https://felixffbl26-cmd.github.io/sonomin/ |
+| Código del tablero | https://github.com/felixffbl26-cmd/sonomin |
+| Base de datos y fotos | Supabase, proyecto `sonomin` (región São Paulo, plan gratis) · https://supabase.com/dashboard/project/aequrttaopjfzlpntwlv |
+| URL del proyecto (para el celular) | `https://aequrttaopjfzlpntwlv.supabase.co` |
+| Clave anon (para el celular, es pública) | está en `docs/config.js` y en Supabase › Project Settings › API Keys › Legacy |
+| Administrador | felixffbl.26@gmail.com |
+
+**Cómo entra una persona nueva:** abre el enlace, pulsa «Solicitar acceso» y crea su cuenta. Usted la aprueba en la pestaña **Accesos** como lector (solo mira), celular (el teléfono que mide) o administrador. Sin su aprobación no ve nada.
+
+**Qué se ve en tiempo real (sin recargar):** cada celular que está midiendo, con nivel cada 2 s, punto, proyecto, modo, coordenadas UTM y geográficas, avance de la medición y gráfico de 3 minutos; su posición y rastro en el mapa satelital; el registro de actividad al segundo (inicio, fin, mediciones guardadas, alertas de 85 dB(A) y del ECA) con sonido y notificación; el avance de cada proyecto frente a su plan; y la estadística completa (descriptiva, distribución, rangos por punto, mapa de calor día × hora, ANOVA y correlaciones).
+
+**Nuevo en la versión 4 (4 de octubre):**
+- **Informe técnico al instante** en la pestaña Informes: pulse «Generar informe técnico» y luego «Imprimir / Guardar PDF». También «Descargar Excel». Usa el filtro de arriba (proyecto, periodo, ámbito).
+- **Eliminar una medición hecha por error:** abra la medición en la pestaña Mediciones, pulse «¿Medición hecha por error? Moverla a la papelera», escriba el motivo y confirme. Sale de todos los cálculos. Desde Mediciones › Papelera se puede restaurar o borrar para siempre. Solo administradores.
+- **Registro** (solo administrador): quién hizo qué y cuándo, incluidos los ingresos al tablero. No se puede editar ni borrar.
+- El historial completo de versiones está en `HISTORIAL.md`.
+
+**Pendiente de su parte:**
+1. Informes automáticos: en GitHub › sonomin › Settings › Secrets and variables › Actions, cree el secreto `SUPABASE_SERVICE_KEY` y pegue la clave **service_role** (Supabase › Project Settings › API Keys › Legacy › Reveal). `SUPABASE_URL` ya está creado. Luego Actions › Informe SONOMIN › Run workflow.
+2. Celular: abra `SONOMIN_android` en Android Studio, compile e instale. En Más › Nube y tiempo real ponga la URL, la clave anon y el correo y contraseña de una cuenta con rol celular (o la suya de administrador mientras prueba). Pulse «Probar conexión».
+3. La contraseña de la base de datos la generó Supabase al crear el proyecto; si la necesita, cámbiela en Project Settings › Database.
+
 ## Cómo funciona (en una línea)
 
 El celular envía a **Supabase** (base de datos y fotos, gratis) → el tablero web publicado en **GitHub Pages** (gratis) lee de Supabase → una tarea de **GitHub Actions** genera cada 6 horas el informe en Excel y PDF y lo deja en la pestaña Informes.

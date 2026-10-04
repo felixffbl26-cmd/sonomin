@@ -386,17 +386,182 @@ $$;
 revoke all on function public.asignar_rol(uuid, text) from public;
 grant execute on function public.asignar_rol(uuid, text) to authenticated;
 
+-- ============================================================================
+-- AMPLIACION v4 · papelera de mediciones, auditoria (quien hizo que y cuando)
+-- y registro de ingresos al tablero
+-- ============================================================================
+
+-- ------------------------------------------------------------- auditoria
+-- Bitacora inmutable: nadie puede editarla ni borrarla desde el tablero.
+-- La llenan triggers y funciones del servidor; solo el administrador la lee.
+create table if not exists public.auditoria (
+  id            bigint generated always as identity primary key,
+  creado        timestamptz not null default now(),
+  usuario_id    uuid,
+  usuario_email text,
+  accion        text not null,
+  objeto        text,
+  detalle       jsonb
+);
+create index if not exists auditoria_creado on public.auditoria (creado desc);
+alter table public.auditoria enable row level security;
+drop policy if exists auditoria_ver on public.auditoria;
+create policy auditoria_ver on public.auditoria
+  for select to authenticated using (public.rol_actual() = 'admin');
+
+-- correo de quien hace la accion (sesion del tablero o del celular); 'sistema' si es un proceso del servidor
+create or replace function public.quien_email()
+returns text language sql stable security definer set search_path = public, auth as $$
+  select coalesce((select email::text from auth.users where id = auth.uid()), 'sistema')
+$$;
+
+create or replace function public.auditar(p_accion text, p_objeto text, p_detalle jsonb)
+returns void language sql security definer set search_path = public as $$
+  insert into public.auditoria (usuario_id, usuario_email, accion, objeto, detalle)
+  values (auth.uid(), public.quien_email(), p_accion, p_objeto, p_detalle);
+$$;
+revoke all on function public.auditar(text, text, jsonb) from public;
+
+-- Acciones que registra el propio tablero (solo estas, para que nadie invente otras)
+create or replace function public.registrar_accion(p_accion text, p_detalle jsonb default '{}'::jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'Sin sesión'; end if;
+  if p_accion not in ('INGRESO', 'INFORME_GENERADO', 'EXPORTACION_CSV', 'EXPORTACION_EXCEL') then
+    raise exception 'Acción no permitida: %', p_accion;
+  end if;
+  perform public.auditar(p_accion, null, coalesce(p_detalle, '{}'::jsonb) || jsonb_build_object('rol', public.rol_actual()));
+end;
+$$;
+revoke all on function public.registrar_accion(text, jsonb) from public;
+grant execute on function public.registrar_accion(text, jsonb) to authenticated;
+
+-- --------------------------------------------------------------- papelera
+alter table public.mediciones add column if not exists eliminada        boolean not null default false;
+alter table public.mediciones add column if not exists eliminada_en     timestamptz;
+alter table public.mediciones add column if not exists eliminada_por    text;
+alter table public.mediciones add column if not exists eliminada_motivo text;
+
+create or replace function public.papelera_medicion(p_uuid uuid, p_motivo text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if public.rol_actual() is distinct from 'admin' then raise exception 'Solo el administrador puede eliminar mediciones'; end if;
+  if coalesce(trim(p_motivo), '') = '' then raise exception 'Escriba el motivo de la eliminación'; end if;
+  update public.mediciones set eliminada = true, eliminada_en = now(), eliminada_por = public.quien_email(), eliminada_motivo = trim(p_motivo)
+    where uuid = p_uuid and not eliminada;
+  if not found then raise exception 'La medición no existe o ya está en la papelera'; end if;
+end;
+$$;
+
+create or replace function public.restaurar_medicion(p_uuid uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if public.rol_actual() is distinct from 'admin' then raise exception 'Solo el administrador puede restaurar mediciones'; end if;
+  update public.mediciones set eliminada = false, eliminada_en = null, eliminada_por = null, eliminada_motivo = null
+    where uuid = p_uuid and eliminada;
+  if not found then raise exception 'La medición no está en la papelera'; end if;
+end;
+$$;
+
+-- Borrado definitivo: solo desde la papelera. Las fotos las borra antes el tablero.
+create or replace function public.eliminar_medicion_definitiva(p_uuid uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if public.rol_actual() is distinct from 'admin' then raise exception 'Solo el administrador puede borrar definitivamente'; end if;
+  delete from public.mediciones where uuid = p_uuid and eliminada;
+  if not found then raise exception 'Solo se puede borrar definitivamente una medición que está en la papelera'; end if;
+end;
+$$;
+revoke all on function public.papelera_medicion(uuid, text) from public;
+revoke all on function public.restaurar_medicion(uuid) from public;
+revoke all on function public.eliminar_medicion_definitiva(uuid) from public;
+grant execute on function public.papelera_medicion(uuid, text) to authenticated;
+grant execute on function public.restaurar_medicion(uuid) to authenticated;
+grant execute on function public.eliminar_medicion_definitiva(uuid) to authenticated;
+
+-- el administrador puede borrar fotos (al eliminar definitivamente una medicion)
+drop policy if exists sonomin_borrar_fotos on storage.objects;
+create policy sonomin_borrar_fotos on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'fotos' and public.rol_actual() = 'admin');
+
+-- ------------------------------------------------- triggers de auditoria
+create or replace function public.auditar_mediciones()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  r record;
+begin
+  r := coalesce(new, old);
+  if tg_op = 'UPDATE' and new.eliminada and not old.eliminada then
+    perform public.auditar('MEDICION_A_PAPELERA', new.uuid::text, jsonb_build_object('proyecto', new.proyecto, 'punto', new.punto, 'leq_dba', new.leq_dba,
+      'fecha', to_char(new.fecha_hora at time zone 'America/Lima', 'DD/MM/YYYY HH24:MI'), 'motivo', new.eliminada_motivo));
+  elsif tg_op = 'UPDATE' and old.eliminada and not new.eliminada then
+    perform public.auditar('MEDICION_RESTAURADA', new.uuid::text, jsonb_build_object('proyecto', new.proyecto, 'punto', new.punto, 'leq_dba', new.leq_dba));
+  elsif tg_op = 'DELETE' then
+    perform public.auditar('MEDICION_ELIMINADA_DEFINITIVA', old.uuid::text, jsonb_build_object('proyecto', old.proyecto, 'punto', old.punto, 'leq_dba', old.leq_dba,
+      'fecha', to_char(old.fecha_hora at time zone 'America/Lima', 'DD/MM/YYYY HH24:MI'), 'motivo', old.eliminada_motivo, 'fotos', old.fotos));
+  end if;
+  return null;
+end;
+$$;
+drop trigger if exists mediciones_auditoria on public.mediciones;
+create trigger mediciones_auditoria after update or delete on public.mediciones
+  for each row execute function public.auditar_mediciones();
+
+create or replace function public.auditar_perfiles()
+returns trigger language plpgsql security definer set search_path = public, auth as $$
+declare
+  correo text := (select email::text from auth.users where id = coalesce(new.user_id, old.user_id));
+begin
+  if tg_op = 'INSERT' then
+    perform public.auditar('ACCESO_OTORGADO', correo, jsonb_build_object('rol', new.rol));
+  elsif tg_op = 'UPDATE' and new.rol is distinct from old.rol then
+    perform public.auditar('ROL_CAMBIADO', correo, jsonb_build_object('antes', old.rol, 'ahora', new.rol));
+  elsif tg_op = 'DELETE' then
+    perform public.auditar('ACCESO_QUITADO', correo, jsonb_build_object('rol', old.rol));
+  end if;
+  return null;
+end;
+$$;
+drop trigger if exists perfiles_auditoria on public.perfiles;
+create trigger perfiles_auditoria after insert or update or delete on public.perfiles
+  for each row execute function public.auditar_perfiles();
+
+create or replace function public.auditar_proyectos()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  perform public.auditar(case tg_op when 'INSERT' then 'PLAN_PROYECTO_CREADO' when 'UPDATE' then 'PLAN_PROYECTO_EDITADO' else 'PLAN_PROYECTO_BORRADO' end,
+    coalesce(new.proyecto, old.proyecto),
+    case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) - 'actualizado' end);
+  return null;
+end;
+$$;
+drop trigger if exists proyectos_auditoria on public.proyectos_meta;
+create trigger proyectos_auditoria after insert or update or delete on public.proyectos_meta
+  for each row execute function public.auditar_proyectos();
+
+create or replace function public.auditar_informes()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  perform public.auditar('INFORME_AUTOMATICO', new.titulo, jsonb_build_object('proyecto', new.proyecto, 'n_mediciones', new.n_mediciones, 'resumen', new.resumen));
+  return null;
+end;
+$$;
+drop trigger if exists informes_auditoria on public.informes;
+create trigger informes_auditoria after insert on public.informes
+  for each row execute function public.auditar_informes();
+
 -- ------------------------------------------------------------- permisos
 -- Privilegios de tabla para la API (las filas igual las filtra la seguridad por filas de arriba).
 -- Hacen falta cuando el proyecto se creo con "Automatically expose new tables" desactivado.
 grant usage on schema public to anon, authenticated, service_role;
 grant select, insert, update, delete on
   public.perfiles, public.mediciones, public.vivo, public.informes,
-  public.posiciones, public.eventos, public.proyectos_meta
+  public.posiciones, public.eventos, public.proyectos_meta, public.auditoria
   to authenticated;
 grant all on
   public.perfiles, public.mediciones, public.vivo, public.informes,
-  public.posiciones, public.eventos, public.proyectos_meta
+  public.posiciones, public.eventos, public.proyectos_meta, public.auditoria
   to service_role;
 grant usage, select on all sequences in schema public to service_role;
 grant execute on function public.rol_actual() to authenticated;
@@ -418,6 +583,9 @@ begin
   end if;
   if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'proyectos_meta') then
     alter publication supabase_realtime add table public.proyectos_meta;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'auditoria') then
+    alter publication supabase_realtime add table public.auditoria;
   end if;
 end $$;
 

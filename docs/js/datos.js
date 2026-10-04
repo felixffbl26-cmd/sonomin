@@ -13,7 +13,7 @@
     "fuente_ruido", "este", "norte", "cota", "tipo_cota", "zona_utm", "latitud", "longitud", "origen_posicion", "precision_m", "duracion_s",
     "leq_dba", "lmax_dba", "lmin_dba", "l10_dba", "l50_dba", "l90_dba", "zona_eca", "limite_eca_dba", "limite_ocupacional_dba",
     "tiempo_permitido_h", "horas_exposicion", "dosis_pct", "offset_cal_db", "calibrado", "saturacion_pct", "fuente_audio", "evaluador",
-    "observacion", "fotos",
+    "observacion", "fotos", "eliminada", "eliminada_en", "eliminada_por", "eliminada_motivo",
   ].join(",");
 
   const D = { modo: enNube ? "nube" : "demo", cliente: null, _cacheFotos: new Map(), _demo: null, usuarioId: null };
@@ -158,6 +158,72 @@
     exigir(await D.cliente.rpc("asignar_rol", { p_usuario: usuario, p_rol: rol || null }));
   };
 
+  // ------------------------------------------------------------- papelera
+  // Solo el administrador. La base de datos lo vuelve a verificar y deja constancia en la auditoria.
+  function auditarDemo(accion, objeto, detalle) {
+    D._audit = D._audit || [];
+    const fila = { id: (D._audit[0] ? D._audit[0].id : 0) + 1, creado: new Date().toISOString(), usuario_email: "demostración", accion, objeto, detalle: detalle || {} };
+    D._audit.unshift(fila);
+    if (D._alAuditoria) D._alAuditoria(fila);
+    return fila;
+  }
+  D.moverPapelera = async function (m, motivo) {
+    if (!enNube) {
+      const f = (D._demo || []).find((x) => x.uuid === m.uuid);
+      if (f) Object.assign(f, { eliminada: true, eliminada_en: new Date().toISOString(), eliminada_por: "demostración", eliminada_motivo: motivo });
+      auditarDemo("MEDICION_A_PAPELERA", m.uuid, { proyecto: m.proyecto, punto: m.punto, leq_dba: m.leq, motivo });
+      return f;
+    }
+    exigir(await D.cliente.rpc("papelera_medicion", { p_uuid: m.uuid, p_motivo: motivo }));
+  };
+  D.restaurar = async function (m) {
+    if (!enNube) {
+      const f = (D._demo || []).find((x) => x.uuid === m.uuid);
+      if (f) Object.assign(f, { eliminada: false, eliminada_en: null, eliminada_por: null, eliminada_motivo: null });
+      auditarDemo("MEDICION_RESTAURADA", m.uuid, { proyecto: m.proyecto, punto: m.punto, leq_dba: m.leq });
+      return f;
+    }
+    exigir(await D.cliente.rpc("restaurar_medicion", { p_uuid: m.uuid }));
+  };
+  /** Borra para siempre: primero sus fotos y luego la fila (solo si ya esta en la papelera). */
+  D.eliminarDefinitivo = async function (m) {
+    if (!enNube) {
+      D._demo = (D._demo || []).filter((x) => x.uuid !== m.uuid);
+      auditarDemo("MEDICION_ELIMINADA_DEFINITIVA", m.uuid, { proyecto: m.proyecto, punto: m.punto, leq_dba: m.leq, motivo: m.eliminada_motivo });
+      return;
+    }
+    const fotos = (m.fotos || []).filter(Boolean);
+    if (fotos.length) {
+      const { error } = await D.cliente.storage.from("fotos").remove(fotos);
+      if (error) throw new Error("No se pudieron borrar las fotos: " + error.message);
+    }
+    exigir(await D.cliente.rpc("eliminar_medicion_definitiva", { p_uuid: m.uuid }));
+  };
+
+  // ------------------------------------------------------------ auditoria
+  D.cargarAuditoria = async function (limite = 2000) {
+    if (!enNube) {
+      if (!D._audit) {
+        const t = (h) => new Date(Date.now() - h * 3600000).toISOString();
+        D._audit = [
+          { id: 4, creado: t(0.05), usuario_email: "admin@ejemplo.pe", accion: "INGRESO", objeto: null, detalle: { rol: "admin" } },
+          { id: 3, creado: t(3), usuario_email: "admin@ejemplo.pe", accion: "ACCESO_OTORGADO", objeto: "ingeniero@ejemplo.pe", detalle: { rol: "lector" } },
+          { id: 2, creado: t(26), usuario_email: "admin@ejemplo.pe", accion: "PLAN_PROYECTO_EDITADO", objeto: "DEMO · Planta y talleres", detalle: { objetivo_puntos: 4 } },
+          { id: 1, creado: t(50), usuario_email: "ingeniero@ejemplo.pe", accion: "INGRESO", objeto: null, detalle: { rol: "lector" } },
+        ];
+      }
+      return D._audit.slice();
+    }
+    return exigir(await D.cliente.from("auditoria").select("*").order("id", { ascending: false }).limit(limite));
+  };
+  /** Registra en la auditoria una accion hecha en el tablero (ingreso, informe, exportacion). Nunca interrumpe al usuario. */
+  D.registrar = async function (accion, detalle) {
+    try {
+      if (!enNube) { auditarDemo(accion, null, detalle); return; }
+      await D.cliente.rpc("registrar_accion", { p_accion: accion, p_detalle: detalle || {} });
+    } catch (e) { /* la auditoria nunca bloquea el trabajo */ }
+  };
+
   // --------------------------------------------------------------- fotos
   D.urlFotos = async function (rutas) {
     const ahora = Date.now(), salida = new Map(), faltan = [];
@@ -198,6 +264,9 @@
     const canal = D.cliente.channel("sonomin-" + Math.random().toString(36).slice(2))
       .on("postgres_changes", { event: "*", schema: "public", table: "vivo" }, (p) => p.new && p.new.id && cb.onVivo(p.new))
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "mediciones" }, (p) => { ultimaMedicion = Math.max(ultimaMedicion, p.new.inicio_ms || 0); cb.onMedicion(p.new); })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "mediciones" }, (p) => cb.onMedicionCambio && p.new && cb.onMedicionCambio(p.new))
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "mediciones" }, (p) => cb.onMedicionBorrada && p.old && cb.onMedicionBorrada(p.old.uuid))
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "auditoria" }, (p) => cb.onAuditoria && cb.onAuditoria(p.new))
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "eventos" }, (p) => { ultimoEvento = Math.max(ultimoEvento, p.new.id || 0); cb.onEvento && cb.onEvento(p.new); })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "informes" }, (p) => cb.onInforme && cb.onInforme(p.new))
       .on("postgres_changes", { event: "*", schema: "public", table: "proyectos_meta" }, (p) => cb.onProyectoMeta && cb.onProyectoMeta(p.new && p.new.proyecto ? p.new : null, p.old))
@@ -226,6 +295,7 @@
   // ----------------------------------------------------- simulacion (demo)
   // Dos celulares imaginarios: uno camina por la planta (recorrido) y otro mide puntos fijos en interior mina.
   function iniciarSimulacion(cb) {
+    D._alAuditoria = cb.onAuditoria || null;
     const R = raiz.SON_DEMO;
     const r = R.azar((Date.now() & 0xffff) + 7);
     const P = Object.fromEntries(R.PUNTOS.map((p) => [p.p, p]));

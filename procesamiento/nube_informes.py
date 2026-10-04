@@ -59,7 +59,8 @@ def comprobar(r, que):
 def leer_mediciones(url, clave, proyecto):
     filas, desde = [], 0
     while True:
-        params = {"select": "*", "order": "inicio_ms.asc", "limit": PAGINA, "offset": desde}
+        # las mediciones en la papelera no entran en el informe
+        params = {"select": "*", "order": "inicio_ms.asc", "limit": PAGINA, "offset": desde, "eliminada": "is.false"}
         if proyecto:
             params["proyecto"] = "ilike.*" + proyecto + "*"
         r = comprobar(requests.get(url + "/rest/v1/mediciones", params=params, headers=cabeceras(clave), timeout=60),

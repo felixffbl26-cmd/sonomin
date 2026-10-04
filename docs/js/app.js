@@ -8,7 +8,7 @@
   const S = {
     todas: [], filtradas: [], filtro: { proyecto: "", dias: 0, ambito: "", modo: "" },
     vivos: new Map(), vivoRecibido: new Map(), hist: new Map(), rastro: new Map(),
-    eventos: [], meta: new Map(), informes: [], vista: "vivo", estadoTR: "", estadoOk: false, rol: "",
+    eventos: [], meta: new Map(), informes: [], papelera: [], auditoria: null, vista: "vivo", estadoTR: "", estadoOk: false, rol: "",
     alertas: { sonido: true, aviso: false }, sucias: new Set(), cargando: false,
   };
   raiz.SON_S = S;
@@ -136,7 +136,7 @@
 
   // ---------------------------------------------------------------- pestanas
   function cambiarVista(v) {
-    if (!raiz.SON_VISTAS[v] || (v === "accesos" && S.rol !== "admin")) v = "vivo";
+    if (!raiz.SON_VISTAS[v] || ((v === "accesos" || v === "registro") && S.rol !== "admin")) v = "vivo";
     S.vista = v;
     document.querySelectorAll(".pestana").forEach((p) => p.setAttribute("aria-selected", p.dataset.vista === v ? "true" : "false"));
     document.querySelectorAll(".vista").forEach((s) => { s.hidden = s.id !== "vista-" + v; });
@@ -172,8 +172,29 @@
   }
   setInterval(() => { textoEstado(); avisarVista("tic"); }, 3000);
 
+  // Una medicion en la papelera no entra en ningun calculo: va a S.papelera (solo la ve el administrador)
+  function ubicarMedicion(m) {
+    S.todas = S.todas.filter((x) => x.uuid !== m.uuid);
+    S.papelera = S.papelera.filter((x) => x.uuid !== m.uuid);
+    if (m.eliminada) S.papelera.unshift(m);
+    else { S.todas.push(m); S.todas.sort((a, b) => (b.ms || 0) - (a.ms || 0)); }
+  }
+  function alMedicionCambio(fila) {
+    const previa = S.todas.find((x) => x.uuid === fila.uuid) || S.papelera.find((x) => x.uuid === fila.uuid);
+    ubicarMedicion(A.normalizar({ ...(previa || {}), ...fila }));
+    pintar(true);
+  }
+  function alMedicionBorrada(uuid) {
+    S.todas = S.todas.filter((x) => x.uuid !== uuid);
+    S.papelera = S.papelera.filter((x) => x.uuid !== uuid);
+    pintar(true);
+  }
+  raiz.SON_UI.ubicarMedicion = (m) => { ubicarMedicion(A.normalizar(m)); pintar(true); };
+  raiz.SON_UI.quitarMedicion = alMedicionBorrada;
+
   function alMedicion(fila) {
-    if (S.todas.some((m) => m.uuid === fila.uuid)) return;
+    if (S.todas.some((m) => m.uuid === fila.uuid) || S.papelera.some((m) => m.uuid === fila.uuid)) return;
+    if (fila.eliminada) { S.papelera.unshift(A.normalizar(fila)); return; }
     S.todas.unshift(A.normalizar(fila));
     if (!S.nombresProyectos().length || ![...document.querySelectorAll("#f-proyecto option")].some((o) => o.value === fila.proyecto)) llenarProyectos();
     // la vista activa se redibuja al instante; las demas cuando se abran
@@ -232,7 +253,9 @@
         D.cargarMediciones(), D.cargarInformes().catch(() => []), D.cargarVivos().catch(() => []), D.cargarEventos().catch(() => []),
         D.cargarPosiciones().catch(() => []), D.cargarProyectosMeta().catch(() => []),
       ]);
-      S.todas = filas.map(A.normalizar);
+      const normal = filas.map(A.normalizar);
+      S.todas = normal.filter((m) => !m.eliminada);
+      S.papelera = normal.filter((m) => m.eliminada);
       S.informes = informes;
       S.eventos = eventos;
       S.meta = new Map(meta.map((m) => [m.proyecto, m]));
@@ -262,9 +285,18 @@
     catch (e) { $("#vista-vivo").replaceChildren(el("div", { class: "caja-aviso grave", texto: "No se pudieron cargar los datos: " + e.message })); }
     const inicial = (location.hash || "#vivo").slice(1);
     cambiarVista(inicial);
+    // registro de ingreso: una vez por pestana abierta (recargar la pagina no cuenta como otro ingreso)
+    let yaRegistrado = false;
+    try { yaRegistrado = sessionStorage.getItem("sonomin_ingreso") === (sesion.email || "demo"); } catch (e) { /* sin almacenamiento */ }
+    if (!yaRegistrado) {
+      D.registrar("INGRESO", { pagina: location.pathname, pantalla: screen.width + "x" + screen.height, navegador: navigator.userAgent.slice(0, 140) });
+      try { sessionStorage.setItem("sonomin_ingreso", sesion.email || "demo"); } catch (e) { /* ignorar */ }
+    }
     if (desuscribir) desuscribir();
     desuscribir = D.suscribir({
       onMedicion: alMedicion, onVivo: alVivo, onEvento: alEvento, onProyectoMeta: alProyectoMeta,
+      onMedicionCambio: alMedicionCambio, onMedicionBorrada: alMedicionBorrada,
+      onAuditoria: (f) => { if (S.auditoria) S.auditoria.unshift(f); const v = raiz.SON_VISTAS.registro; if (S.vista === "registro" && v && v.alAuditoria) v.alAuditoria(S, f); },
       onInforme: (f) => { S.informes.unshift(f); S.sucias.add("informes"); if (S.vista === "informes") pintar(false); mostrarAviso("Nuevo informe disponible: " + f.titulo, "info"); },
       onEstado: (t, ok) => { S.estadoTR = t; S.estadoOk = ok; textoEstado(); },
     });
@@ -312,7 +344,8 @@
   $("#boton-salir").addEventListener("click", async () => {
     if (desuscribir) { desuscribir(); desuscribir = null; }
     await D.salir();
-    S.todas = []; S.vivos.clear(); S.hist.clear(); S.rastro.clear(); S.eventos = [];
+    S.todas = []; S.papelera = []; S.auditoria = null; S.vivos.clear(); S.hist.clear(); S.rastro.clear(); S.eventos = [];
+    try { sessionStorage.removeItem("sonomin_ingreso"); } catch (e) { /* ignorar */ }
     Object.values(raiz.SON_VISTAS).forEach((v) => { v.montada = false; });
     if (D.enNube) { $("#app").hidden = true; $("#pantalla-login").hidden = false; $("#login-clave").value = ""; mostrarFormulario("login"); }
     else location.reload();
