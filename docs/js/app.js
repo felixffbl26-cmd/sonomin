@@ -285,13 +285,6 @@
     catch (e) { $("#vista-vivo").replaceChildren(el("div", { class: "caja-aviso grave", texto: "No se pudieron cargar los datos: " + e.message })); }
     const inicial = (location.hash || "#vivo").slice(1);
     cambiarVista(inicial);
-    // registro de ingreso: una vez por pestana abierta (recargar la pagina no cuenta como otro ingreso)
-    let yaRegistrado = false;
-    try { yaRegistrado = sessionStorage.getItem("sonomin_ingreso") === (sesion.email || "demo"); } catch (e) { /* sin almacenamiento */ }
-    if (!yaRegistrado) {
-      D.registrar("INGRESO", { pagina: location.pathname, pantalla: screen.width + "x" + screen.height, navegador: navigator.userAgent.slice(0, 140) });
-      try { sessionStorage.setItem("sonomin_ingreso", sesion.email || "demo"); } catch (e) { /* ignorar */ }
-    }
     if (desuscribir) desuscribir();
     desuscribir = D.suscribir({
       onMedicion: alMedicion, onVivo: alVivo, onEvento: alEvento, onProyectoMeta: alProyectoMeta,
@@ -300,6 +293,13 @@
       onInforme: (f) => { S.informes.unshift(f); S.sucias.add("informes"); if (S.vista === "informes") pintar(false); mostrarAviso("Nuevo informe disponible: " + f.titulo, "info"); },
       onEstado: (t, ok) => { S.estadoTR = t; S.estadoOk = ok; textoEstado(); },
     });
+    // registro de ingreso (despues de conectar el tiempo real): una vez por pestana abierta; recargar no cuenta como otro ingreso
+    let yaRegistrado = false;
+    try { yaRegistrado = sessionStorage.getItem("sonomin_ingreso") === (sesion.email || "demo"); } catch (e) { /* sin almacenamiento */ }
+    if (!yaRegistrado) {
+      D.registrar("INGRESO", { pagina: location.pathname, pantalla: screen.width + "x" + screen.height, navegador: navigator.userAgent.slice(0, 140) });
+      try { sessionStorage.setItem("sonomin_ingreso", sesion.email || "demo"); } catch (e) { /* ignorar */ }
+    }
   }
 
   // ------------------------------------------------------- login y registro
