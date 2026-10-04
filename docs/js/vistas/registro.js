@@ -79,7 +79,7 @@
   async function render(cont, S) {
     refs = {};
     cont.replaceChildren(el("div", { class: "tarjeta" }, el("p", { class: "mudo", texto: "Cargando el registro…" })));
-    try { if (!S.auditoria) S.auditoria = await D.cargarAuditoria(); }
+    try { S.auditoria = await D.cargarAuditoria(); } // siempre fresco al abrir; luego se actualiza en vivo
     catch (e) { cont.replaceChildren(el("div", { class: "caja-aviso grave", texto: "No se pudo leer el registro: " + e.message + ". ¿Se ejecutó la versión 4 del esquema en Supabase?" })); return; }
     refs.kpis = el("div", { class: "rejilla cols-4" });
     refs.cuerpo = el("tbody");
