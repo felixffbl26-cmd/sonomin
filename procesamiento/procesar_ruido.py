@@ -3,8 +3,8 @@
 """
 SONOMIN - Procesamiento y prediccion de ruido en mineria
 =========================================================
-Idea y direccion : Ing. Lesmes Gabriel Calsina Paricahua
 Desarrollo       : Felix Fernando Bautista Layme
+Asesor           : Ing. Lesmes Gabriel Calsina Paricahua
                    Facultad de Ingenieria de Minas - UNA Puno
 
 Lee los CSV exportados por la app SONOMIN (Android) y genera:
@@ -454,7 +454,7 @@ def fig_series(df, ruta, k=6):
 def pagina_texto(pdf, titulo, lineas):
     fig = plt.figure(figsize=(8.27, 11.69))
     fig.text(0.08, 0.95, "SONOMIN - INFORME DE MONITOREO DE RUIDO", fontsize=13, fontweight="bold", color=AZUL)
-    fig.text(0.08, 0.93, "Idea y direccion: Ing. Lesmes Gabriel Calsina Paricahua  |  Desarrollo: Felix Fernando Bautista Layme",
+    fig.text(0.08, 0.93, "Desarrollo: Felix Fernando Bautista Layme  |  Asesor: Ing. Lesmes Gabriel Calsina Paricahua",
              fontsize=7.5, color=GRIS)
     fig.add_artist(plt.Line2D([0.08, 0.92], [0.922, 0.922], color=AZUL, lw=1))
     fig.text(0.08, 0.89, titulo, fontsize=12, fontweight="bold")

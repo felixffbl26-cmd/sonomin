@@ -23,18 +23,42 @@
       nota ? el("div", { class: "nota", texto: nota }) : null);
   }
 
-  /* Foto de evidencia: muestra un recuadro mientras carga la URL firmada. */
-  function foto(ruta, alt) {
+  /* Lineas del rotulo de evidencia, iguales a las que la app imprime sobre la foto. */
+  function lineasRotulo(m) {
+    if (!m) return [];
+    const { fechaHora } = raiz.SON_G;
+    const n1 = (x) => (Number.isFinite(x) ? x.toFixed(1) : "-");
+    return [
+      "SONOMIN · " + (m.proyecto || ""),
+      "Punto " + (m.punto || "") + (m.labor ? "  " + m.labor : ""),
+      "Leq " + n1(m.leq) + " dB(A)   Lmax " + n1(m.lmax) + "   " + (Number.isFinite(m.dur) ? Math.round(m.dur) : "-") + " s",
+      "E " + n1(m.este) + "  N " + n1(m.norte) + "  Cota " + n1(m.cota) + " (" + (m.zona_utm || "19S") + ")",
+      (m.ms ? fechaHora(m.ms) : "") + "   " + (m.ambito || "") + "   " + (m.origen_posicion || ""),
+      (m.evaluador || "evaluador s/n") + " · " + (m.calibrado ? "calibrado " + n1(Number(m.offset_cal_db)) + " dB" : "SIN CALIBRAR"),
+    ];
+  }
+
+  /* Foto de evidencia con rotulo de respaldo.
+   * Si la app no pudo imprimir el rotulo (foto_sellada = false) se dibujan encima los datos guardados
+   * de la medicion; si no se sabe (registros antiguos) se muestra un rotulo breve. */
+  function foto(ruta, alt, m) {
     const caja = el("div");
     if (!ruta) { caja.appendChild(el("div", { class: "foto-vacia", texto: "Esta medición no tiene foto" })); return caja; }
     caja.appendChild(el("div", { class: "foto-vacia", texto: "Cargando foto…" }));
     D.urlFotos([ruta]).then((mapa) => {
       const url = mapa.get(ruta);
       if (!url) { caja.replaceChildren(el("div", { class: "foto-vacia", texto: "La foto aún no llega desde el celular" })); return; }
+      const lineas = lineasRotulo(m);
       const img = el("img", { src: url, alt: alt || "Foto de evidencia", loading: "lazy" });
-      img.addEventListener("click", () => raiz.SON_UI.verFoto(url));
+      img.addEventListener("click", () => raiz.SON_UI.verFoto(url, lineas.join("\n")));
       img.addEventListener("error", () => caja.replaceChildren(el("div", { class: "foto-vacia", texto: "La foto aún no llega desde el celular" })));
-      caja.replaceChildren(img);
+      const sellada = m && m.foto_sellada === true;
+      // solo cuando la app avisa que no pudo imprimirlo; en registros antiguos (sin dato) no se tapa la foto:
+      // los datos aparecen al ampliarla
+      const rotulo = m && m.foto_sellada === false
+        ? el("div", { class: "foto-rotulo" }, el("b", { texto: lineas[0] }), el("span", { class: "sin-sello", texto: "(rótulo agregado por la página)" }), lineas.slice(1).map((l) => el("div", { texto: l })))
+        : null;
+      caja.replaceChildren(el("div", { class: "foto-caja" + (sellada ? " sellada" : "") }, img, rotulo));
     });
     return caja;
   }
@@ -64,5 +88,5 @@
   /** Hay algun celular midiendo ahora (dato nuevo hace menos de 12 s). */
   function vivoReciente(S) { return typeof S.activos === "function" && S.activos().length > 0; }
 
-  raiz.SON_U = { vivoReciente, pill, hace, kpi, foto, descargar, csv, ordenar, vacio, TEXTO_SEM, f1 };
+  raiz.SON_U = { vivoReciente, pill, hace, kpi, foto, lineasRotulo, descargar, csv, ordenar, vacio, TEXTO_SEM, f1 };
 })(window);

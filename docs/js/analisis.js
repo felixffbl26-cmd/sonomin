@@ -141,6 +141,8 @@
     if (m.calibrado === false) av.push("Equipo sin calibrar contra un sonómetro patrón: valor referencial.");
     if ((num(m.precision_m) || 0) > 30) av.push("Precisión GPS baja (" + Number(m.precision_m).toFixed(0) + " m).");
     if (m.dur < 30 && m.modo === "PUNTUAL") av.push("Medición corta (" + m.dur.toFixed(0) + " s): la Guía N° 1 pide tiempos de medición representativos.");
+    else if (m.dur < 300 && m.modo === "PUNTUAL" && m.leq !== null && m.leq >= 80) av.push("Muestra de " + m.dur.toFixed(0) + " s en un punto con " + m.leq.toFixed(1) + " dB(A): para estimar la dosis conviene medir al menos 5 minutos o un ciclo completo de la operación.");
+    if (m.foto_sellada === false) av.push("La foto no lleva el rótulo impreso (falló en el celular); la página muestra los datos de la medición sobre ella.");
     return av;
   }
 
@@ -412,8 +414,72 @@
     return celdas.map((fila) => fila.map((c) => ({ n: c.leqs.length, leq: c.leqs.length ? leqEnergetico(c.leqs, c.pesos) : null })));
   }
 
+  // ------------------------------------------------ estaciones de monitoreo
+  // La app nombra cada tramo de un recorrido, bloque de jornada o lectura continua con un sufijo
+  // (P-02-T004, P-02-H03, P-02-M012). La estacion es el punto base que escribio el operador.
+  const SUFIJO = /-(T\d{3,}|M\d{3,}|H\d{2,})$/;
+  function estacionDe(m) {
+    const e = typeof m.estacion === "string" ? m.estacion.trim() : "";
+    if (e) return e;
+    const p = String(m.punto || "").trim();
+    return m.modo === "PUNTUAL" ? p : p.replace(SUFIJO, "");
+  }
+  function metros(a, b) {
+    const dy = (a.lat - b.lat) * 110574, dx = (a.lon - b.lon) * 111320 * Math.cos((a.lat * Math.PI) / 180);
+    return Math.hypot(dx, dy);
+  }
+  /**
+   * Agrupa mediciones por estacion de monitoreo.
+   *  - opciones.soloFijos: solo mediciones en modo Punto fijo (criterio estricto).
+   *  - opciones.radioM: une ademas las estaciones del mismo proyecto y ambito cuyos centros
+   *    esten a menos de radioM metros (0 = no unir por distancia).
+   * Devuelve la misma estructura que porPunto, con 'nombres' (estaciones unidas) y 'dias' distintos.
+   */
+  function porEstacion(meds, opciones = {}) {
+    const radio = opciones.radioM || 0;
+    const base = meds.filter((m) => m.leq !== null && (!opciones.soloFijos || m.modo === "PUNTUAL"));
+    const grupos = new Map();
+    base.forEach((m) => {
+      const k = m.proyecto + "||" + estacionDe(m);
+      if (!grupos.has(k)) grupos.set(k, { proyecto: m.proyecto, nombre: estacionDe(m), ambito: m.ambito, filas: [] });
+      grupos.get(k).filas.push(m);
+    });
+    const lista = [...grupos.values()];
+    lista.forEach((g) => {
+      const geo = g.filas.filter((x) => x.lat !== null && x.lon !== null);
+      g.centro = geo.length ? { lat: media(geo.map((x) => x.lat)), lon: media(geo.map((x) => x.lon)) } : null;
+    });
+    // union por cercania (union-find), solo dentro del mismo proyecto y ambito
+    const padre = lista.map((_, i) => i);
+    const raizDe = (i) => (padre[i] === i ? i : (padre[i] = raizDe(padre[i])));
+    if (radio > 0) {
+      for (let i = 0; i < lista.length; i++) for (let j = i + 1; j < lista.length; j++) {
+        const a = lista[i], b = lista[j];
+        if (a.proyecto !== b.proyecto || a.ambito !== b.ambito || !a.centro || !b.centro) continue;
+        if (metros(a.centro, b.centro) <= radio) padre[raizDe(j)] = raizDe(i);
+      }
+    }
+    const unidos = new Map();
+    lista.forEach((g, i) => {
+      const r = raizDe(i);
+      if (!unidos.has(r)) unidos.set(r, []);
+      unidos.get(r).push(g);
+    });
+    const copias = [], nombresDe = new Map();
+    for (const gs of unidos.values()) {
+      gs.sort((a, b) => b.filas.length - a.filas.length);
+      const nombre = gs[0].nombre + (gs.length > 1 ? " (+" + (gs.length - 1) + " cercana" + (gs.length > 2 ? "s" : "") + ")" : "");
+      nombresDe.set(gs[0].proyecto + "||" + nombre, gs.map((g) => g.nombre));
+      gs.forEach((g) => g.filas.forEach((m) => copias.push({ ...m, punto: nombre })));
+    }
+    return porPunto(copias).map((p) => ({
+      ...p, nombres: nombresDe.get(p.clave) || [p.punto],
+      dias: new Set(p.filas.map((m) => m.dia)).size,
+    }));
+  }
+
   return {
-    latLonDe, percentil, descriptiva, histograma, anova, correlacion, mapaCalor, pF, t95,
+    latLonDe, estacionDe, porEstacion, percentil, descriptiva, histograma, anova, correlacion, mapaCalor, pF, t95,
     num, media, desvio, leqEnergetico, normalCdf, pT, wilson, normalizar, calidad, porPunto, perfilHorario,
     cumplimiento, dosisPorDia, proyeccionLocal, idwDb, validacionCruzada, rejillaIdw, tendencia, pronosticoPunto,
     perfilEsperado, simular,

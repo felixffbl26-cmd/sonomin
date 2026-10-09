@@ -156,7 +156,7 @@
     const resV = el("div");
     function pintarEsperado() {
       const meds = S.filtradas.filter((m) => m.leq !== null);
-      const pts = A.porPunto(meds);
+      const pts = A.porEstacion(meds);
       const multa = E.ambito === "eca" ? (E.resA && E.resA.sancionable ? E.resA.multaUIT : null) : (E.resO && E.resO.calculable ? E.resO.multaUIT : null);
       resV.replaceChildren();
       if (multa === null) {
@@ -173,7 +173,7 @@
           const dia = filasP.filter((m) => N.esDiurno(m.ms)).length >= filasP.length / 2;
           filasP = filasP.filter((m) => N.esDiurno(m.ms) === dia); limite = dia ? zona.diurno : zona.nocturno;
         }
-        const r = A.pronosticoPunto(filasP, E.horizonte, limite);
+        const r = A.pronosticoPunto(filasP, E.horizonte, limite, { minN: 5 });
         return { p, r, limite, ev: r.suficiente ? P.valorEsperado({ probExceso: r.probModelo, probSancion: E.probSancion / 100, multaUIT: multa }) : null };
       }).sort((a, b) => (b.ev ? b.ev.uit : -1) - (a.ev ? a.ev.uit : -1));
       const total = filas.reduce((s, f) => s + (f.ev ? f.ev.soles : 0), 0);

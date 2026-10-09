@@ -2,123 +2,208 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>SONOMIN · Monitoreo de ruido en minería</title>
-<meta name="description" content="Tablero en tiempo real de monitoreo de ruido ocupacional y ambiental en minería. FIM - UNA Puno.">
+<meta name="description" content="Monitoreo de ruido ocupacional y ambiental en minería, en tiempo real. Facultad de Ingeniería de Minas, UNA Puno.">
 <meta name="robots" content="noindex">
-<link rel="icon" href="img/logo_una.png">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://server.arcgisonline.com https://tile.openstreetmap.org; connect-src 'self' https://*.supabase.co wss://*.supabase.co; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'">
+<meta name="theme-color" content="#0C2D5C">
+<link rel="icon" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/sonomin_192.png">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="estilo.css">
+<script src="js/tema.js"></script>
 </head>
 <body>
 
+<!-- iconos (trazo, 24 px) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-vivo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M8.5 15.5a5 5 0 0 1 0-7M15.5 8.5a5 5 0 0 1 0 7M5.6 18.4a9 9 0 0 1 0-12.8M18.4 5.6a9 9 0 0 1 0 12.8"/></symbol>
+    <symbol id="i-mapa" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></symbol>
+    <symbol id="i-proyectos" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-mediciones" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+    <symbol id="i-analisis" viewBox="0 0 24 24"><path d="M3 12h3l3-7 4 14 3-7h5"/></symbol>
+    <symbol id="i-estadistica" viewBox="0 0 24 24"><path d="M5 20v-8M11 20V5M17 20v-5M3 20h18"/></symbol>
+    <symbol id="i-pronostico" viewBox="0 0 24 24"><path d="m3 17 6-6 4 4 8-8M15 7h6v6"/></symbol>
+    <symbol id="i-penalidades" viewBox="0 0 24 24"><path d="M12 4v16M6 20h12M4 8h16M7 8l-3 6a3 3 0 0 0 6 0zM17 8l-3 6a3 3 0 0 0 6 0z"/></symbol>
+    <symbol id="i-informes" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"/></symbol>
+    <symbol id="i-accesos" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/></symbol>
+    <symbol id="i-registro" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6L3.5 8.5M3.5 3.5v5h5M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-mas" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="i-sol" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-luna" viewBox="0 0 24 24"><path d="M20.5 13.5A8.5 8.5 0 1 1 10.5 3.5a6.6 6.6 0 0 0 10 10z"/></symbol>
+    <symbol id="i-auto" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
+    <symbol id="i-campana" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 20.5a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-salir" viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11"/></symbol>
+    <symbol id="i-filtro" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></symbol>
+    <symbol id="i-cerrar" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  </defs>
+</svg>
+
 <!-- ============================================================ acceso -->
-<section id="pantalla-login" hidden>
+<section id="pantalla-login" class="pantalla-login" hidden>
   <div class="login">
-    <div class="tarjeta">
-      <div class="logos" style="margin-bottom:12px"><img src="img/logo_una.png" alt="UNA Puno" height="46" style="background:#fff;border-radius:8px;padding:3px"><img src="img/fim_logo.png" alt="FIM" height="46" style="background:#fff;border-radius:8px;padding:3px"></div>
-      <h1 style="font-size:22px">SONOMIN</h1>
-      <p class="mudo">Monitoreo de ruido en minería · Facultad de Ingeniería de Minas, UNA Puno</p>
+    <div class="login-marca">
+      <img src="img/sonomin.svg" alt="" class="login-logo" width="104" height="104">
+      <h1>SONOMIN</h1>
+      <p class="login-lema">Monitoreo de ruido en minería</p>
+      <p class="login-fac">Facultad de Ingeniería de Minas · UNA Puno</p>
+    </div>
+    <div class="tarjeta login-caja">
       <form id="form-login" autocomplete="on">
+        <h2>Ingresar</h2>
         <label class="campo"><span>Correo</span><input id="login-correo" type="email" autocomplete="username" required></label>
         <label class="campo"><span>Contraseña</span><input id="login-clave" type="password" autocomplete="current-password" required></label>
         <div class="error" id="login-error" role="alert"></div>
-        <button class="boton" type="submit">Entrar</button>
-        <p class="mudo" style="font-size:13px;margin:0">¿No tiene cuenta? <button type="button" class="enlace" id="ir-registro">Solicitar acceso</button></p>
+        <button class="boton grande" type="submit">Entrar</button>
+        <p class="mudo pequeno">¿No tiene cuenta? <button type="button" class="enlace" id="ir-registro">Solicitar acceso</button></p>
       </form>
       <form id="form-registro" autocomplete="on" hidden>
-        <p style="margin:0;font-size:14px">Cree su cuenta. El administrador revisará su solicitud y le dará acceso.</p>
+        <h2>Solicitar acceso</h2>
+        <p class="pequeno">Cree su cuenta. El administrador revisará su solicitud, le dará un rol y le asignará los proyectos que podrá ver.</p>
         <label class="campo"><span>Nombre y cargo</span><input id="reg-nombre" type="text" autocomplete="name" required maxlength="80" placeholder="Ej. Ing. Juan Pérez, supervisor SSOMA"></label>
         <label class="campo"><span>Correo</span><input id="reg-correo" type="email" autocomplete="email" required></label>
         <label class="campo"><span>Contraseña (mínimo 8 caracteres)</span><input id="reg-clave" type="password" autocomplete="new-password" required minlength="8"></label>
         <label class="campo"><span>Repita la contraseña</span><input id="reg-clave2" type="password" autocomplete="new-password" required minlength="8"></label>
-        <label class="campo"><span>¿Para qué necesita el acceso? (opcional)</span><input id="reg-motivo" type="text" maxlength="160"></label>
+        <label class="campo"><span>Empresa, unidad minera o proyecto (opcional)</span><input id="reg-motivo" type="text" maxlength="160"></label>
         <div class="error" id="registro-error" role="alert"></div>
         <div class="caja-aviso ok" id="registro-ok" hidden></div>
-        <button class="boton" type="submit">Enviar solicitud</button>
-        <p class="mudo" style="font-size:13px;margin:0">¿Ya tiene cuenta? <button type="button" class="enlace" id="ir-login">Entrar</button></p>
+        <button class="boton grande" type="submit">Enviar solicitud</button>
+        <p class="mudo pequeno">¿Ya tiene cuenta? <button type="button" class="enlace" id="ir-login">Entrar</button></p>
       </form>
-      <p class="mudo" style="margin-top:14px;font-size:12px">Acceso solo para personas autorizadas por el administrador del monitoreo.</p>
     </div>
+    <div class="login-logos"><img src="img/logo_una.png" alt="Universidad Nacional del Altiplano" height="64"><img src="img/fim_logo.png" alt="Facultad de Ingeniería de Minas" height="64"></div>
+    <p class="creditos">Desarrollo: Felix Fernando Bautista Layme · Asesor: Ing. Lesmes Gabriel Calsina Paricahua</p>
+    <p class="creditos">Acceso solo para personas autorizadas. Cada ingreso queda registrado.</p>
   </div>
 </section>
 
 <!-- ============================================================ aplicacion -->
-<div id="app" hidden>
-  <div id="aviso-demo" class="aviso-demo" hidden>MODO DEMOSTRACIÓN · los datos que ve son sintéticos, generados para probar el tablero. No son mediciones reales.</div>
-  <header class="cabecera">
-    <div class="cabecera-fila">
-      <div class="logos"><img src="img/logo_una.png" alt="UNA Puno"><img src="img/fim_logo.png" alt="FIM"></div>
-      <div class="titulo-app"><strong>SONOMIN</strong><span>Monitoreo de ruido en minería · FIM - UNA Puno</span></div>
-      <div class="estado" aria-live="polite"><span id="punto-estado" class="punto-estado"></span><span id="texto-estado">Conectando…</span></div>
-      <span class="usuario-actual" id="usuario-actual"></span>
-      <button class="boton-cab" id="boton-alertas" type="button" title="Sonido y notificación cuando una medición llegue a 85 dB(A) o supere el ECA">Alertas</button>
-      <button class="boton-cab" id="boton-tema" type="button" title="Cambiar entre tema claro y oscuro">Tema</button>
-      <button class="boton-cab" id="boton-salir" type="button">Salir</button>
+<div id="app" class="app" hidden>
+  <aside class="lateral" aria-label="Menú">
+    <div class="marca">
+      <img src="img/sonomin.svg" alt="" width="40" height="40">
+      <div><strong>SONOMIN</strong><span>Monitoreo de ruido en minería</span></div>
     </div>
-  </header>
-
-  <nav class="pestanas" aria-label="Secciones">
-    <div class="pestanas-fila" role="tablist">
-      <button class="pestana" role="tab" data-vista="vivo" aria-selected="true">En vivo</button>
-      <button class="pestana" role="tab" data-vista="mapa" aria-selected="false">Mapa</button>
-      <button class="pestana" role="tab" data-vista="proyectos" aria-selected="false">Proyectos</button>
-      <button class="pestana" role="tab" data-vista="mediciones" aria-selected="false">Mediciones</button>
-      <button class="pestana" role="tab" data-vista="analisis" aria-selected="false">Análisis</button>
-      <button class="pestana" role="tab" data-vista="estadistica" aria-selected="false">Estadística</button>
-      <button class="pestana" role="tab" data-vista="pronostico" aria-selected="false">Pronóstico</button>
-      <button class="pestana" role="tab" data-vista="penalidades" aria-selected="false">Penalidades</button>
-      <button class="pestana" role="tab" data-vista="informes" aria-selected="false">Informes</button>
-      <button class="pestana" role="tab" data-vista="accesos" aria-selected="false" data-solo="admin" hidden>Accesos</button>
-      <button class="pestana" role="tab" data-vista="registro" aria-selected="false" data-solo="admin" hidden>Registro</button>
-    </div>
-  </nav>
-
-  <div class="filtros">
-    <div class="filtros-fila">
-      <label class="campo"><span>Proyecto</span><select id="f-proyecto"></select></label>
-      <div class="campo"><span>Periodo</span>
-        <div class="grupo-botones" id="f-periodo">
-          <button type="button" data-dias="1" aria-pressed="false">Hoy</button>
-          <button type="button" data-dias="7" aria-pressed="false">7 días</button>
-          <button type="button" data-dias="30" aria-pressed="false">30 días</button>
-          <button type="button" data-dias="0" aria-pressed="true">Todo</button>
-        </div>
+    <nav class="menu" aria-label="Secciones">
+      <p class="menu-grupo">Campo</p>
+      <button class="pestana" type="button" data-vista="vivo"><svg><use href="#i-vivo"/></svg><span>En vivo</span></button>
+      <button class="pestana" type="button" data-vista="mapa"><svg><use href="#i-mapa"/></svg><span>Mapa</span></button>
+      <button class="pestana" type="button" data-vista="proyectos"><svg><use href="#i-proyectos"/></svg><span>Proyectos</span></button>
+      <p class="menu-grupo">Datos y cálculo</p>
+      <button class="pestana" type="button" data-vista="mediciones"><svg><use href="#i-mediciones"/></svg><span>Mediciones</span></button>
+      <button class="pestana" type="button" data-vista="analisis"><svg><use href="#i-analisis"/></svg><span>Análisis</span></button>
+      <button class="pestana" type="button" data-vista="estadistica"><svg><use href="#i-estadistica"/></svg><span>Estadística</span></button>
+      <button class="pestana" type="button" data-vista="pronostico"><svg><use href="#i-pronostico"/></svg><span>Pronóstico</span></button>
+      <button class="pestana" type="button" data-vista="penalidades"><svg><use href="#i-penalidades"/></svg><span>Penalidades</span></button>
+      <button class="pestana" type="button" data-vista="informes"><svg><use href="#i-informes"/></svg><span>Informes</span></button>
+      <p class="menu-grupo" data-solo="admin" hidden>Administración</p>
+      <button class="pestana" type="button" data-vista="accesos" data-solo="admin" hidden><svg><use href="#i-accesos"/></svg><span>Accesos</span></button>
+      <button class="pestana" type="button" data-vista="registro" data-solo="admin" hidden><svg><use href="#i-registro"/></svg><span>Registro</span></button>
+    </nav>
+    <div class="lateral-pie">
+      <div class="usuario"><b class="usuario-correo"></b><span class="usuario-rol"></span></div>
+      <div class="selector-tema" role="group" aria-label="Apariencia">
+        <button type="button" data-tema="claro" title="Tema claro"><svg><use href="#i-sol"/></svg><span>Claro</span></button>
+        <button type="button" data-tema="oscuro" title="Tema oscuro"><svg><use href="#i-luna"/></svg><span>Oscuro</span></button>
+        <button type="button" data-tema="" title="Igual que el sistema"><svg><use href="#i-auto"/></svg><span>Sistema</span></button>
       </div>
-      <label class="campo"><span>Ámbito</span>
-        <select id="f-ambito"><option value="">Superficie e interior</option><option value="SUPERFICIE">Superficie</option><option value="INTERIOR">Interior mina</option></select>
-      </label>
-      <label class="campo"><span>Modo de medición</span>
-        <select id="f-modo"><option value="">Todos</option><option value="PUNTUAL">Punto fijo</option><option value="RECORRIDO">Recorrido</option><option value="JORNADA">Jornada</option><option value="CONTINUO">Monitoreo continuo</option></select>
-      </label>
-      <span class="mudo" id="f-resumen" style="margin-left:auto;font-size:13px"></span>
+      <button type="button" class="boton-lat accion-alertas"><svg><use href="#i-campana"/></svg><span>Alertas</span></button>
+      <button type="button" class="boton-lat accion-salir"><svg><use href="#i-salir"/></svg><span>Cerrar sesión</span></button>
     </div>
+  </aside>
+
+  <div class="contenido">
+    <div id="aviso-demo" class="aviso-demo" hidden>MODO DEMOSTRACIÓN · datos sintéticos generados para probar el tablero. No son mediciones reales.</div>
+    <header class="barra">
+      <div class="barra-marca"><img src="img/sonomin.svg" alt="" width="32" height="32"><strong>SONOMIN</strong></div>
+      <div class="barra-titulo"><h1 id="titulo-vista">En vivo</h1><p id="sub-vista"></p></div>
+      <div class="estado" aria-live="polite"><span id="punto-estado" class="punto-estado"></span><span id="texto-estado">Conectando…</span></div>
+      <button type="button" class="boton-icono boton-filtros" id="boton-filtros" aria-expanded="false" aria-controls="filtros" title="Filtros"><svg><use href="#i-filtro"/></svg></button>
+    </header>
+
+    <div class="filtros" id="filtros">
+      <div class="filtros-fila">
+        <label class="campo"><span>Proyecto</span><select id="f-proyecto"></select></label>
+        <div class="campo"><span>Periodo</span>
+          <div class="grupo-botones" id="f-periodo">
+            <button type="button" data-dias="1" aria-pressed="false">Hoy</button>
+            <button type="button" data-dias="7" aria-pressed="false">7 días</button>
+            <button type="button" data-dias="30" aria-pressed="false">30 días</button>
+            <button type="button" data-dias="0" aria-pressed="true">Todo</button>
+          </div>
+        </div>
+        <label class="campo"><span>Ámbito</span>
+          <select id="f-ambito"><option value="">Superficie e interior</option><option value="SUPERFICIE">Superficie</option><option value="INTERIOR">Interior mina</option></select>
+        </label>
+        <label class="campo"><span>Modo de medición</span>
+          <select id="f-modo"><option value="">Todos</option><option value="PUNTUAL">Punto fijo</option><option value="RECORRIDO">Recorrido</option><option value="JORNADA">Jornada</option><option value="CONTINUO">Monitoreo continuo</option></select>
+        </label>
+        <span class="mudo" id="f-resumen"></span>
+      </div>
+    </div>
+
+    <main>
+      <div id="aviso-proyectos" class="caja-aviso info" hidden></div>
+      <section class="vista" id="vista-vivo"></section>
+      <section class="vista" id="vista-mapa" hidden></section>
+      <section class="vista" id="vista-proyectos" hidden></section>
+      <section class="vista" id="vista-mediciones" hidden></section>
+      <section class="vista" id="vista-analisis" hidden></section>
+      <section class="vista" id="vista-estadistica" hidden></section>
+      <section class="vista" id="vista-pronostico" hidden></section>
+      <section class="vista" id="vista-penalidades" hidden></section>
+      <section class="vista" id="vista-informes" hidden></section>
+      <section class="vista" id="vista-accesos" hidden></section>
+      <section class="vista" id="vista-registro" hidden></section>
+    </main>
+
+    <footer class="pie">
+      <div class="pie-logos"><img src="img/logo_una.png" alt="UNA Puno" height="40"><img src="img/fim_logo.png" alt="FIM" height="40"></div>
+      <div>
+        <p><b>SONOMIN</b> · Desarrollo: Felix Fernando Bautista Layme · Asesor: Ing. Lesmes Gabriel Calsina Paricahua · Facultad de Ingeniería de Minas, UNA Puno.</p>
+        <p>Normas: D.S. 024-2016-EM (Anexo 12 y Guía N° 1) y D.S. 085-2003-PCM. Las estimaciones de multas son referenciales y no sustituyen el análisis legal. Mapa: imágenes © Esri, Maxar, Earthstar Geographics; calles © colaboradores de OpenStreetMap.</p>
+      </div>
+    </footer>
   </div>
 
-  <main>
-    <section class="vista" id="vista-vivo"></section>
-    <section class="vista" id="vista-mapa" hidden></section>
-    <section class="vista" id="vista-proyectos" hidden></section>
-    <section class="vista" id="vista-mediciones" hidden></section>
-    <section class="vista" id="vista-analisis" hidden></section>
-    <section class="vista" id="vista-estadistica" hidden></section>
-    <section class="vista" id="vista-pronostico" hidden></section>
-    <section class="vista" id="vista-penalidades" hidden></section>
-    <section class="vista" id="vista-informes" hidden></section>
-    <section class="vista" id="vista-accesos" hidden></section>
-    <section class="vista" id="vista-registro" hidden></section>
-  </main>
-
-  <footer class="pie">
-    SONOMIN · idea y dirección: Ing. Lesmes Gabriel Calsina Paricahua · desarrollo: Felix Fernando Bautista Layme · FIM - UNA Puno.
-    Normas: D.S. 024-2016-EM (Anexo 12 y Guía N° 1) y D.S. 085-2003-PCM. Las estimaciones de multas son referenciales y no sustituyen el análisis legal.
-    Mapa: imágenes © Esri, Maxar, Earthstar Geographics; calles © colaboradores de OpenStreetMap.
-  </footer>
+  <nav class="inferior" aria-label="Secciones principales">
+    <button class="pestana" type="button" data-vista="vivo"><svg><use href="#i-vivo"/></svg><span>En vivo</span></button>
+    <button class="pestana" type="button" data-vista="mapa"><svg><use href="#i-mapa"/></svg><span>Mapa</span></button>
+    <button class="pestana" type="button" data-vista="mediciones"><svg><use href="#i-mediciones"/></svg><span>Mediciones</span></button>
+    <button class="pestana" type="button" data-vista="analisis"><svg><use href="#i-analisis"/></svg><span>Análisis</span></button>
+    <button class="pestana-mas" type="button" id="boton-mas" aria-haspopup="dialog"><svg><use href="#i-mas"/></svg><span>Más</span></button>
+  </nav>
 </div>
+
+<dialog id="hoja-mas" class="hoja" aria-label="Más secciones">
+  <div class="hoja-cab"><b>Más</b><button type="button" class="boton-icono" id="cerrar-mas" aria-label="Cerrar"><svg><use href="#i-cerrar"/></svg></button></div>
+  <div class="hoja-rejilla">
+    <button class="pestana" type="button" data-vista="proyectos"><svg><use href="#i-proyectos"/></svg><span>Proyectos</span></button>
+    <button class="pestana" type="button" data-vista="estadistica"><svg><use href="#i-estadistica"/></svg><span>Estadística</span></button>
+    <button class="pestana" type="button" data-vista="pronostico"><svg><use href="#i-pronostico"/></svg><span>Pronóstico</span></button>
+    <button class="pestana" type="button" data-vista="penalidades"><svg><use href="#i-penalidades"/></svg><span>Penalidades</span></button>
+    <button class="pestana" type="button" data-vista="informes"><svg><use href="#i-informes"/></svg><span>Informes</span></button>
+    <button class="pestana" type="button" data-vista="accesos" data-solo="admin" hidden><svg><use href="#i-accesos"/></svg><span>Accesos</span></button>
+    <button class="pestana" type="button" data-vista="registro" data-solo="admin" hidden><svg><use href="#i-registro"/></svg><span>Registro</span></button>
+  </div>
+  <div class="usuario"><b class="usuario-correo"></b><span class="usuario-rol"></span></div>
+  <div class="selector-tema" role="group" aria-label="Apariencia">
+    <button type="button" data-tema="claro"><svg><use href="#i-sol"/></svg><span>Claro</span></button>
+    <button type="button" data-tema="oscuro"><svg><use href="#i-luna"/></svg><span>Oscuro</span></button>
+    <button type="button" data-tema=""><svg><use href="#i-auto"/></svg><span>Sistema</span></button>
+  </div>
+  <div class="fila">
+    <button type="button" class="boton-lat accion-alertas"><svg><use href="#i-campana"/></svg><span>Alertas</span></button>
+    <button type="button" class="boton-lat accion-salir"><svg><use href="#i-salir"/></svg><span>Cerrar sesión</span></button>
+  </div>
+</dialog>
 
 <dialog id="dialogo"><div class="dialogo-cab"><h2 id="dialogo-titulo"></h2><button class="boton sec" type="button" id="dialogo-cerrar">Cerrar</button></div><div class="dialogo-cuerpo" id="dialogo-cuerpo"></div></dialog>
 <div class="avisos" id="avisos" aria-live="polite"></div>
-<dialog id="visor" class="visor"><img id="visor-img" alt="Foto de evidencia ampliada"></dialog>
+<dialog id="visor" class="visor"><figure><img id="visor-img" alt="Foto de evidencia ampliada"><figcaption id="visor-pie"></figcaption></figure></dialog>
 
 <script src="vendor/supabase.js"></script>
 <script src="vendor/leaflet/leaflet.js"></script>
@@ -130,6 +215,7 @@
 <script src="js/demo.js"></script>
 <script src="js/datos.js"></script>
 <script src="js/util.js"></script>
+<script src="js/mapas.js"></script>
 <script src="js/vistas/vivo.js"></script>
 <script src="js/vistas/mapa.js"></script>
 <script src="js/vistas/proyectos.js"></script>

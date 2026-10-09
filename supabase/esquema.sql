@@ -1,5 +1,5 @@
 -- ============================================================================
--- SONOMIN · esquema de la base de datos en Supabase
+-- SONOMIN · esquema de la base de datos en Supabase (version 5)
 -- Pegar COMPLETO en: Supabase > SQL Editor > New query > Run
 -- Se puede ejecutar mas de una vez sin romper nada.
 -- ============================================================================
@@ -345,7 +345,8 @@ drop policy if exists perfiles_admin on public.perfiles;
 create policy perfiles_admin on public.perfiles
   for select to authenticated using (public.rol_actual() = 'admin');
 
-create or replace function public.usuarios_acceso()
+drop function if exists public.usuarios_acceso();  -- la version 5 la vuelve a crear con los proyectos
+create function public.usuarios_acceso()
 returns table (user_id uuid, email text, nombre text, motivo text, rol text, creado timestamptz,
                ultimo_ingreso timestamptz, confirmado boolean)
 language plpgsql stable security definer set search_path = public, auth as $$
@@ -588,6 +589,210 @@ begin
     alter publication supabase_realtime add table public.auditoria;
   end if;
 end $$;
+
+-- ============================================================================
+-- AMPLIACION v5 · acceso por proyecto, estacion de monitoreo, sello de la foto
+-- y endurecimiento de la seguridad
+--   admin            : ve y administra todo.
+--   lector / celular : solo ven los proyectos que el administrador les asigna
+--                      (el celular ve ademas lo que el mismo envio).
+--   El celular puede ENVIAR mediciones de cualquier proyecto (nunca se pierde un dato
+--   de campo), pero no puede leer proyectos que no tiene asignados.
+-- ============================================================================
+
+-- ------------------------------------------------- columnas nuevas
+alter table public.mediciones add column if not exists estacion     text;     -- punto base (sin -T001/-M001/-H01)
+alter table public.mediciones add column if not exists foto_sellada boolean;  -- la foto lleva el rotulo de datos impreso
+alter table public.mediciones add column if not exists usuario_id   uuid;     -- cuenta que envio la medicion (la fija el servidor)
+alter table public.vivo       add column if not exists usuario_id   uuid;
+
+-- estacion para las filas antiguas
+update public.mediciones
+   set estacion = case when modo in ('RECORRIDO', 'CONTINUO', 'JORNADA')
+                       then regexp_replace(trim(punto), '-(T[0-9]{3,}|M[0-9]{3,}|H[0-9]{2,})$', '')
+                       else trim(punto) end
+ where estacion is null and punto is not null;
+create index if not exists mediciones_estacion on public.mediciones (proyecto, estacion);
+
+-- El servidor fija quien envio la fila (no se puede suplantar) y completa la estacion si la app es antigua.
+create or replace function public.mediciones_completar()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is not null then new.usuario_id := auth.uid(); end if;
+  if coalesce(trim(new.estacion), '') = '' and new.punto is not null then
+    new.estacion := case when new.modo in ('RECORRIDO', 'CONTINUO', 'JORNADA')
+                         then regexp_replace(trim(new.punto), '-(T[0-9]{3,}|M[0-9]{3,}|H[0-9]{2,})$', '')
+                         else trim(new.punto) end;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists mediciones_completar on public.mediciones;
+create trigger mediciones_completar before insert on public.mediciones
+  for each row execute function public.mediciones_completar();
+
+create or replace function public.vivo_marcar_hora()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.actualizado := now();
+  if auth.uid() is not null then new.usuario_id := auth.uid(); end if;
+  return new;
+end;
+$$;
+
+-- ------------------------------------------------- proyectos asignados
+create table if not exists public.acceso_proyectos (
+  user_id  uuid not null references auth.users (id) on delete cascade,
+  proyecto text not null,
+  asignado timestamptz not null default now(),
+  primary key (user_id, proyecto)
+);
+alter table public.acceso_proyectos enable row level security;
+drop policy if exists acceso_proyectos_ver on public.acceso_proyectos;
+create policy acceso_proyectos_ver on public.acceso_proyectos
+  for select to authenticated using (user_id = auth.uid() or public.rol_actual() = 'admin');
+-- (sin politicas de escritura: solo se cambia con asignar_proyectos)
+
+create or replace function public.puede_ver(p_proyecto text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select case
+    when public.rol_actual() = 'admin' then true
+    when public.rol_actual() in ('lector', 'celular') then
+      exists (select 1 from public.acceso_proyectos a where a.user_id = auth.uid() and a.proyecto = p_proyecto)
+    else false end
+$$;
+
+create or replace function public.mis_proyectos()
+returns setof text language sql stable security definer set search_path = public as $$
+  select proyecto from public.acceso_proyectos where user_id = auth.uid() order by proyecto
+$$;
+
+create or replace function public.asignar_proyectos(p_usuario uuid, p_proyectos text[])
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if public.rol_actual() is distinct from 'admin' then
+    raise exception 'Solo el administrador puede asignar proyectos';
+  end if;
+  delete from public.acceso_proyectos
+   where user_id = p_usuario and proyecto <> all (coalesce(p_proyectos, '{}'));
+  insert into public.acceso_proyectos (user_id, proyecto)
+    select p_usuario, trim(x) from unnest(coalesce(p_proyectos, '{}')) as x where coalesce(trim(x), '') <> ''
+    on conflict do nothing;
+end;
+$$;
+
+create or replace function public.auditar_acceso_proyectos()
+returns trigger language plpgsql security definer set search_path = public, auth as $$
+declare
+  correo text := (select email::text from auth.users where id = coalesce(new.user_id, old.user_id));
+begin
+  if tg_op = 'INSERT' then
+    perform public.auditar('PROYECTO_ASIGNADO', correo, jsonb_build_object('proyecto', new.proyecto));
+  elsif tg_op = 'DELETE' then
+    perform public.auditar('PROYECTO_QUITADO', correo, jsonb_build_object('proyecto', old.proyecto));
+  end if;
+  return null;
+end;
+$$;
+drop trigger if exists acceso_proyectos_auditoria on public.acceso_proyectos;
+create trigger acceso_proyectos_auditoria after insert or delete on public.acceso_proyectos
+  for each row execute function public.auditar_acceso_proyectos();
+
+-- usuarios_acceso ahora devuelve tambien los proyectos asignados
+drop function if exists public.usuarios_acceso();
+create function public.usuarios_acceso()
+returns table (user_id uuid, email text, nombre text, motivo text, rol text, creado timestamptz,
+               ultimo_ingreso timestamptz, confirmado boolean, proyectos text[])
+language plpgsql stable security definer set search_path = public, auth as $$
+begin
+  if public.rol_actual() is distinct from 'admin' then
+    raise exception 'Solo el administrador puede ver los accesos';
+  end if;
+  return query
+    select u.id, u.email::text, (u.raw_user_meta_data ->> 'nombre')::text, (u.raw_user_meta_data ->> 'motivo')::text,
+           p.rol, u.created_at, u.last_sign_in_at, (u.email_confirmed_at is not null),
+           coalesce((select array_agg(a.proyecto order by a.proyecto) from public.acceso_proyectos a where a.user_id = u.id), '{}')
+    from auth.users u left join public.perfiles p on p.user_id = u.id
+    order by (p.rol is null) desc, u.created_at desc;
+end;
+$$;
+
+-- ------------------------------------------------- lectura por proyecto
+drop policy if exists mediciones_ver on public.mediciones;
+create policy mediciones_ver on public.mediciones
+  for select to authenticated using (
+    public.rol_actual() = 'admin'
+    or (not eliminada and (public.puede_ver(proyecto) or (usuario_id = auth.uid() and public.rol_actual() = 'celular'))));
+
+drop policy if exists vivo_ver on public.vivo;
+create policy vivo_ver on public.vivo
+  for select to authenticated using (public.puede_ver(proyecto) or usuario_id = auth.uid());
+
+-- un celular solo actualiza su propia fila en vivo
+drop policy if exists vivo_actualizar on public.vivo;
+create policy vivo_actualizar on public.vivo
+  for update to authenticated
+  using (public.rol_actual() = 'admin' or (public.rol_actual() = 'celular' and (usuario_id is null or usuario_id = auth.uid())))
+  with check (public.rol_actual() in ('celular', 'admin'));
+
+drop policy if exists posiciones_ver on public.posiciones;
+create policy posiciones_ver on public.posiciones
+  for select to authenticated using (public.puede_ver(proyecto));
+
+drop policy if exists eventos_ver on public.eventos;
+create policy eventos_ver on public.eventos
+  for select to authenticated using (public.puede_ver(proyecto));
+
+drop policy if exists informes_ver on public.informes;
+create policy informes_ver on public.informes
+  for select to authenticated using (public.rol_actual() = 'admin' or (proyecto is not null and public.puede_ver(proyecto)));
+
+drop policy if exists proyectos_meta_ver on public.proyectos_meta;
+create policy proyectos_meta_ver on public.proyectos_meta
+  for select to authenticated using (public.puede_ver(proyecto));
+
+-- fotos: solo las de mediciones que la persona puede ver (o las que su celular subio)
+drop policy if exists sonomin_leer on storage.objects;
+create policy sonomin_leer on storage.objects
+  for select to authenticated using (
+    (bucket_id = 'fotos' and (
+       public.rol_actual() = 'admin'
+       or owner_id = auth.uid()::text
+       or exists (select 1 from public.mediciones m
+                   where m.uuid::text = split_part(name, '/', 1) and not m.eliminada and public.puede_ver(m.proyecto))))
+    or (bucket_id = 'informes' and (
+       public.rol_actual() = 'admin'
+       or exists (select 1 from public.informes i, jsonb_array_elements(coalesce(i.archivos, '[]'::jsonb)) a
+                   where a ->> 'ruta' = name and i.proyecto is not null and public.puede_ver(i.proyecto)))));
+
+drop policy if exists sonomin_actualizar_fotos on storage.objects;
+create policy sonomin_actualizar_fotos on storage.objects
+  for update to authenticated
+  using (bucket_id = 'fotos' and (public.rol_actual() = 'admin' or (public.rol_actual() = 'celular' and owner_id = auth.uid()::text)))
+  with check (bucket_id = 'fotos' and public.rol_actual() in ('celular', 'admin'));
+
+-- ------------------------------------------------- funciones: quien puede llamarlas
+-- Supabase da permiso de ejecucion a 'anon' y 'authenticated' sobre toda funcion nueva.
+-- Las internas se cierran: nadie puede escribir en la auditoria llamando a auditar() desde fuera.
+revoke execute on function public.auditar(text, text, jsonb) from public, anon, authenticated;
+revoke execute on function public.quien_email() from public, anon;
+revoke execute on function public.mediciones_completar() from public, anon, authenticated;
+revoke execute on function public.auditar_acceso_proyectos() from public, anon, authenticated;
+do $$
+declare f text;
+begin
+  foreach f in array array[
+    'public.rol_actual()', 'public.puede_ver(text)', 'public.mis_proyectos()', 'public.usuarios_acceso()',
+    'public.asignar_rol(uuid, text)', 'public.asignar_proyectos(uuid, text[])', 'public.registrar_accion(text, jsonb)',
+    'public.papelera_medicion(uuid, text)', 'public.restaurar_medicion(uuid)', 'public.eliminar_medicion_definitiva(uuid)']
+  loop
+    execute 'revoke execute on function ' || f || ' from public, anon';
+    execute 'grant execute on function ' || f || ' to authenticated';
+  end loop;
+end $$;
+
+grant select, insert, update, delete on public.acceso_proyectos to authenticated;
+grant all on public.acceso_proyectos to service_role;
 
 -- ============================================================================
 -- PASO FINAL (despues de crear los usuarios en Authentication > Users):

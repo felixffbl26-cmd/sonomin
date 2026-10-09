@@ -25,7 +25,7 @@
     // fotos
     if (m.fotos.length) {
       const gal = el("div", { class: "galeria", style: "margin-top:10px" });
-      m.fotos.forEach((r) => gal.appendChild(U.foto(r, "Foto de " + m.punto)));
+      m.fotos.forEach((r) => gal.appendChild(U.foto(r, "Foto de " + m.punto, m)));
       cuerpo.appendChild(gal);
     }
 
@@ -38,7 +38,10 @@
       dato("Cota", m.cota !== null ? f1(m.cota) + " " + (m.tipo_cota || "") : "–"),
       dato("Posición", (m.origen_posicion || "–") + (m.precision_m ? " · precisión " + f0(Number(m.precision_m)) + " m" : "")),
       dato("Equipo", (m.calibrado ? "calibrado (ajuste " + f1(Number(m.offset_cal_db)) + " dB)" : "SIN calibrar") + " · " + (m.fuente_audio || "")),
-      dato("Saturación", f1(Number(m.saturacion_pct) || 0) + " %"), dato("Identificador", m.uuid)));
+      dato("Saturación", f1(Number(m.saturacion_pct) || 0) + " %"),
+      dato("Estación de monitoreo", A.estacionDe(m) || "–"),
+      dato("Rótulo impreso en la foto", !m.fotos.length ? "sin foto" : m.foto_sellada === true ? "sí" : m.foto_sellada === false ? "no (la página muestra los datos encima)" : "no registrado (app anterior)"),
+      dato("Identificador", m.uuid)));
     cuerpo.appendChild(el("div", { class: "tabla-caja", style: "margin-top:10px" }, tabla));
 
     // memoria de calculo con las dos normas
@@ -71,7 +74,7 @@
       const lo = Math.min(...serie), hi = Math.max(...serie);
       linea(grafSerie, { series: [{ nombre: "Nivel 1 s", color: raiz.SON_G.css("--serie-1"), puntos: serie.map((y, i) => ({ x: i, y, detalle: ["segundo " + i] })) }],
         dominioY: [Math.floor((lo - 5) / 5) * 5, Math.ceil((hi + 5) / 5) * 5], tiempo: false, alto: 180, formatoX: (v) => v + " s",
-        limites: [{ v: 85, etiqueta: "85", color: "#d03b3b" }] });
+        limites: [{ v: 85, etiqueta: "85", color: "#e74c3c" }] });
     } else grafSerie.appendChild(el("p", { class: "mudo", texto: "Esta medición no trae la serie de 1 s." }));
   }
   // ------------------------------------------------------------- papelera

@@ -123,3 +123,31 @@ test("Excel: zip valido (CRC-32 estandar y firma PK)", () => {
   const b = X.crear([{ nombre: "A", columnas: ["x"], filas: [[1], ["ñ"]] }]);
   assert.strictEqual(b[0], 0x50); assert.strictEqual(b[1], 0x4b);
 });
+
+test("estaciones: sufijos de recorrido, jornada y continuo se unen en el punto base", () => {
+  const mk = (o) => A.normalizar(Object.assign({ proyecto: "X", ambito: "SUPERFICIE", duracion_s: 60, inicio_ms: 1790000000000 }, o));
+  assert.equal(A.estacionDe({ punto: "P-02-T004", modo: "RECORRIDO" }), "P-02");
+  assert.equal(A.estacionDe({ punto: "P-02-H03", modo: "JORNADA" }), "P-02");
+  assert.equal(A.estacionDe({ punto: "P-02-M012", modo: "CONTINUO" }), "P-02");
+  assert.equal(A.estacionDe({ punto: "P-02-M012", modo: "PUNTUAL" }), "P-02-M012"); // un punto fijo conserva su nombre
+  assert.equal(A.estacionDe({ punto: "Q-1-T001", estacion: "Q-1 Chancadora", modo: "RECORRIDO" }), "Q-1 Chancadora");
+  const ms = [
+    mk({ punto: "P-02-M001", modo: "CONTINUO", leq_dba: 80, latitud: -15.5, longitud: -70.1 }),
+    mk({ punto: "P-02-M002", modo: "CONTINUO", leq_dba: 82, latitud: -15.50001, longitud: -70.1, inicio_ms: 1790100000000 }),
+    mk({ punto: "P-02", modo: "PUNTUAL", leq_dba: 81, latitud: -15.50003, longitud: -70.1 }),
+    mk({ punto: "P-03", modo: "PUNTUAL", leq_dba: 75, latitud: -15.50008, longitud: -70.1 }),  // ~9 m de P-02
+    mk({ punto: "P-09", modo: "PUNTUAL", leq_dba: 70, latitud: -15.6, longitud: -70.1 }),
+  ];
+  const e = A.porEstacion(ms);
+  assert.equal(e.find((p) => p.punto === "P-02").n, 3);
+  assert.equal(e.find((p) => p.punto === "P-02").dias, 2);
+  const c = A.porEstacion(ms, { radioM: 15 });
+  const unida = c.find((p) => p.nombres.length > 1);
+  assert.ok(unida && unida.n === 4 && unida.nombres.includes("P-03"));
+  assert.equal(A.porEstacion(ms, { soloFijos: true }).length, 3);
+});
+test("pronostico: con minimo 5 hay resultado preliminar", () => {
+  const filas = [80, 81, 82, 83, 84].map((l, i) => A.normalizar({ proyecto: "X", punto: "P", leq_dba: l, inicio_ms: 1790000000000 + i * 86400000, duracion_s: 300 }));
+  assert.equal(A.pronosticoPunto(filas, 30, 85).suficiente, false);
+  assert.equal(A.pronosticoPunto(filas, 30, 85, { minN: 5 }).suficiente, true);
+});

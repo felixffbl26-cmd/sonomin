@@ -1,10 +1,23 @@
 # SONOMIN · historial de cambios
 
-Idea y dirección: **Ing. Lesmes Gabriel Calsina Paricahua** · Desarrollo: **Felix Fernando Bautista Layme** · FIM – UNA Puno
+Desarrollo: **Felix Fernando Bautista Layme** · Asesor: **Ing. Lesmes Gabriel Calsina Paricahua** · FIM – UNA Puno
 
 Cada versión anota qué se hizo, por qué y qué quedó pendiente. Las fechas son de 2026.
 
 ---
+
+## v5.0 · 8 de octubre · seguridad por proyecto, pronóstico por estación, mapas y diseño de la app
+
+**Por qué:** el pronóstico decía «datos insuficientes» en todos los puntos, algunas fotos llegaban sin rótulo, los mapas saltaban y se enredaban con muchos puntos, un lector podía ver todos los proyectos y la página no se parecía a la app.
+
+- **Pronóstico:** la causa era el nombre de los puntos. En recorrido, jornada y monitoreo continuo la app agrega un sufijo a cada lectura (P-02-T004, P-02-H03, P-02-M012) y la página tomaba cada una como un punto distinto (n = 1). Ahora se agrupa por **estación de monitoreo** (con opción de unir lecturas a menos de 15 m o de usar solo puntos fijos), el mínimo es 5 mediciones (preliminar) y 10 (firme), y la página dice cuántas faltan y qué datos tomar. El informe y las penalidades usan el mismo criterio.
+- **Fotos:** la app Android abría la foto a resolución completa (falla de memoria en celulares de 48–108 MP) e ignoraba el giro EXIF; la app iOS dependía de un solo intento con Skia. Ambas: foto reducida y derecha, reintento, aviso al operador y columna `foto_sellada`. La página dibuja el rótulo con los datos de la medición cuando la foto no lo trae.
+- **Mapas (página):** el mapa recuerda dónde lo dejó la persona y ya no se reencuadra cuando llegan datos; los celulares se actualizan sin parpadear ni cerrar el globo abierto; los puntos cercanos se agrupan; lista «Ir a un punto» con buscador; vista por estación o por punto. **Mapas (apps):** zoom con dos dedos, «Reajustar», etiquetas que no se enciman y lista de estaciones para ir a cada una.
+- **Seguridad:** acceso por proyecto en la base de datos (`acceso_proyectos`, `puede_ver`, `asignar_proyectos`, auditoría de asignaciones); fotos e informes protegidos por proyecto; un celular solo actualiza su propia fila en vivo y el servidor fija quién envió cada medición; se cerró la función interna `auditar` (antes se podía llamar desde fuera y escribir registros falsos); textos de los mapas siempre como texto (sin HTML); política de seguridad de contenido (CSP) en la página.
+- **Diseño:** misma identidad que la app (logo SONOMIN, verde esmeralda, azul institucional, tarjetas, semáforo), menú lateral en computadora y barra inferior en celular, letra más grande, modo claro / oscuro / sistema.
+- **Créditos:** Desarrollo, Felix Fernando Bautista Layme; Asesor, Ing. Lesmes Gabriel Calsina Paricahua.
+- **Auditoría técnica** de la app y la página desde la ingeniería de minas: `AUDITORIA_TECNICA.md`.
+- Base de datos: columnas `estacion`, `foto_sellada`, `usuario_id`. Probado en PostgreSQL 16 sobre una base en versión 4 (como la de Supabase) y en una nueva; el esquema se puede ejecutar varias veces.
 
 ## v4.0.1 · 4 de octubre · ajustes tras la prueba en la nube
 
@@ -63,5 +76,6 @@ Cada versión anota qué se hizo, por qué y qué quedó pendiente. Las fechas s
 ### Pendientes conocidos
 
 - Compilar la app Android en Android Studio (no se pudo compilar en el entorno de desarrollo) y probar en un celular real calibrado.
+- App iOS: ejecutar `npm install` (se agregó `expo-image-manipulator`) y probar el sello de la foto en un iPhone.
 - Contrastar la tabla del Anexo 12, la fila de ruido de Osinergmin y las cifras OEFA marcadas "RESUMEN" con los textos oficiales.
 - Las estimaciones de multas son referenciales.

@@ -54,11 +54,11 @@
   function usuarios() {
     const t = (h) => new Date(Date.now() - h * 3600000).toISOString();
     return [
-      { user_id: "u-demo-5", email: "supervisor.drem@ejemplo.pe", nombre: "Supervisor (demo)", motivo: "Revisar el monitoreo para el concurso", rol: null, creado: t(2), ultimo_ingreso: null, confirmado: true },
-      { user_id: "u-demo-1", email: "celular1@ejemplo.pe", nombre: "Celular 1", motivo: "", rol: "celular", creado: t(400), ultimo_ingreso: t(0.1), confirmado: true },
-      { user_id: "u-demo-2", email: "celular2@ejemplo.pe", nombre: "Celular 2", motivo: "", rol: "celular", creado: t(400), ultimo_ingreso: t(0.2), confirmado: true },
-      { user_id: "u-demo-3", email: "ingeniero@ejemplo.pe", nombre: "Ingeniero (demo)", motivo: "", rol: "lector", creado: t(300), ultimo_ingreso: t(5), confirmado: true },
-      { user_id: "u-demo-4", email: "admin@ejemplo.pe", nombre: "Administrador (demo)", motivo: "", rol: "admin", creado: t(500), ultimo_ingreso: t(0), confirmado: true },
+      { user_id: "u-demo-5", email: "supervisor.drem@ejemplo.pe", nombre: "Supervisor (demo)", motivo: "Revisar el monitoreo para el concurso", rol: null, creado: t(2), ultimo_ingreso: null, confirmado: true, proyectos: [] },
+      { user_id: "u-demo-1", email: "celular1@ejemplo.pe", nombre: "Celular 1", motivo: "", rol: "celular", creado: t(400), ultimo_ingreso: t(0.1), confirmado: true, proyectos: ["DEMO · Planta y talleres"] },
+      { user_id: "u-demo-2", email: "celular2@ejemplo.pe", nombre: "Celular 2", motivo: "", rol: "celular", creado: t(400), ultimo_ingreso: t(0.2), confirmado: true, proyectos: ["DEMO · Interior mina Nv 4300"] },
+      { user_id: "u-demo-3", email: "ingeniero@ejemplo.pe", nombre: "Ingeniero (demo)", motivo: "", rol: "lector", creado: t(300), ultimo_ingreso: t(5), confirmado: true, proyectos: ["DEMO · Planta y talleres", "DEMO · Interior mina Nv 4300"] },
+      { user_id: "u-demo-4", email: "admin@ejemplo.pe", nombre: "Administrador (demo)", motivo: "", rol: "admin", creado: t(500), ultimo_ingreso: t(0), confirmado: true, proyectos: [] },
     ];
   }
 
@@ -113,7 +113,7 @@
           zona_eca: zonaEca, limite_eca_dba: null, limite_ocupacional_dba: 85, horas_exposicion: 8,
           offset_cal_db: 108.4, calibrado: true, saturacion_pct: r() < 0.05 ? 3 : 0, fuente_audio: "UNPROCESSED",
           evaluador: pt.amb === "INTERIOR" ? "Evaluador B (demo)" : "Evaluador A (demo)", observacion: "", serie_1s: serie.join("|"),
-          fotos: ["demo/" + uuid + ".jpg"],
+          fotos: ["demo/" + uuid + ".jpg"], foto_sellada: true,
         });
       }
     });

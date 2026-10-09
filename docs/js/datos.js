@@ -9,11 +9,11 @@
 
   // Se omite serie_1s del listado (pesa) y se pide al abrir una medicion.
   const COLUMNAS = [
-    "uuid", "proyecto", "proyecto_id", "modo", "recorrido_id", "secuencia", "inicio_ms", "fecha_hora", "turno_eca", "ambito", "punto", "labor",
+    "uuid", "proyecto", "proyecto_id", "modo", "recorrido_id", "secuencia", "inicio_ms", "fecha_hora", "turno_eca", "ambito", "punto", "estacion", "labor",
     "fuente_ruido", "este", "norte", "cota", "tipo_cota", "zona_utm", "latitud", "longitud", "origen_posicion", "precision_m", "duracion_s",
     "leq_dba", "lmax_dba", "lmin_dba", "l10_dba", "l50_dba", "l90_dba", "zona_eca", "limite_eca_dba", "limite_ocupacional_dba",
     "tiempo_permitido_h", "horas_exposicion", "dosis_pct", "offset_cal_db", "calibrado", "saturacion_pct", "fuente_audio", "evaluador",
-    "observacion", "fotos", "eliminada", "eliminada_en", "eliminada_por", "eliminada_motivo",
+    "observacion", "fotos", "foto_sellada", "eliminada", "eliminada_en", "eliminada_por", "eliminada_motivo",
   ].join(",");
 
   const D = { modo: enNube ? "nube" : "demo", cliente: null, _cacheFotos: new Map(), _demo: null, usuarioId: null };
@@ -147,6 +147,23 @@
   D.usuarios = async function () {
     if (!enNube) { if (!D._usuarios) D._usuarios = raiz.SON_DEMO.usuarios(); return D._usuarios.map((u) => ({ ...u })); }
     return exigir(await D.cliente.rpc("usuarios_acceso"));
+  };
+
+  /** Proyectos que el administrador asigno a este usuario (lector o celular). */
+  D.misProyectos = async function () {
+    if (!enNube) return null;
+    const data = exigir(await D.cliente.rpc("mis_proyectos"));
+    return (data || []).map((x) => (typeof x === "string" ? x : x.mis_proyectos)).filter(Boolean);
+  };
+
+  D.asignarProyectos = async function (usuario, proyectos) {
+    if (!enNube) {
+      const u = (D._usuarios || []).find((x) => x.user_id === usuario);
+      if (u) u.proyectos = proyectos.slice();
+      auditarDemo("PROYECTO_ASIGNADO", u ? u.email : usuario, { proyecto: proyectos.join(", ") });
+      return;
+    }
+    exigir(await D.cliente.rpc("asignar_proyectos", { p_usuario: usuario, p_proyectos: proyectos }));
   };
 
   D.asignarRol = async function (usuario, rol) {
@@ -321,7 +338,7 @@
         precision_m: c.ambito === "INTERIOR" ? null : 4, duracion_s: dur, leq_dba: +leq.toFixed(1), lmax_dba: +(Math.max(...leqs) + 2).toFixed(1), lmin_dba: +(Math.min(...leqs) - 1).toFixed(1),
         l10_dba: +(leq + 2).toFixed(1), l50_dba: +(leq - 0.4).toFixed(1), l90_dba: +(leq - 2.8).toFixed(1),
         zona_eca: "INDUSTRIAL", limite_ocupacional_dba: 85, horas_exposicion: 8, offset_cal_db: 108.4, calibrado: true, saturacion_pct: 0, fuente_audio: "UNPROCESSED",
-        evaluador: c.evaluador, observacion: "", serie_1s: leqs.map((x) => x.toFixed(1)).join("|"), fotos: ["demo/" + uuid + ".jpg"],
+        evaluador: c.evaluador, observacion: "", serie_1s: leqs.map((x) => x.toFixed(1)).join("|"), fotos: ["demo/" + uuid + ".jpg"], foto_sellada: true,
       };
       D._demo.unshift(fila);
       cb.onMedicion(fila);

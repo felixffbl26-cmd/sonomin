@@ -49,7 +49,8 @@
       return { ...g, n: g.filas.length, leq, supera: leq > g.limite, sobre: g.filas.filter((m) => m.leq > m.limEca).length };
     }).sort((a, b) => a.punto.localeCompare(b.punto) || a.turno.localeCompare(b.turno));
     const anova = A.anova(puntos.map((p) => p.filas.map((m) => m.leq)));
-    const riesgo = puntos.map((p) => ({ p, r: A.pronosticoPunto(p.filas, 30, N.LIMITE_OCUPACIONAL) })).filter((x) => x.r.suficiente);
+    // tendencia por estacion de monitoreo (une los tramos P-02-T001, P-02-M004... en P-02); minimo 5 mediciones
+    const riesgo = A.porEstacion(meds).map((p) => ({ p, r: A.pronosticoPunto(p.filas, 30, N.LIMITE_OCUPACIONAL, { minN: 5 }) })).filter((x) => x.r.suficiente);
     const conFotos = meds.filter((m) => m.fotos && m.fotos.length);
     const ms = meds.map((m) => m.ms).filter(Boolean);
     return { meds, puntos, d, proyectos, evaluadores, sup, calibradas, modos, ocup, eca, anova, riesgo, conFotos,
@@ -138,8 +139,8 @@
       ["Alcance (filtro aplicado)", alcanceTexto + (p.dias ? " · últimos " + (p.dias === 1 ? "hoy" : p.dias + " días") : "")],
       ["Mediciones / puntos", X.meds.length + " mediciones en " + X.puntos.length + " puntos"],
       ["Evaluador(es)", X.evaluadores.join("; ") || "–"],
-      ["Idea y dirección", "Ing. Lesmes Gabriel Calsina Paricahua"],
       ["Desarrollo del sistema", "Felix Fernando Bautista Layme"],
+      ["Asesor", "Ing. Lesmes Gabriel Calsina Paricahua"],
     ]));
 
     // I. Objetivo
@@ -210,10 +211,10 @@
 
     // IX. Tendencia y riesgo
     doc.appendChild(seccion(n++, "TENDENCIA Y RIESGO A 30 DÍAS",
-      X.riesgo.length ? tabla(["Punto", "n", "Tendencia", "Nivel esperado", "P(≥ 85 dB(A))", "Base"],
+      X.riesgo.length ? tabla(["Estación", "n", "Tendencia", "Nivel esperado", "P(≥ 85 dB(A))", "Base"],
         X.riesgo.map(({ p: q, r }) => [q.punto, r.n, r.tendencia.suficiente ? (r.tendencia.b >= 0 ? "+" : "") + f2(r.tendencia.b) + " dB/día" + (r.tendencia.p < 0.05 ? " (significativa)" : " (no significativa)") : "–",
-          f1(r.mediaProy) + " dB(A)", f0(100 * r.probModelo) + " %", r.usarTendencia ? "tendencia" : "media histórica"]), [1, 3, 4])
-        : parrafo("Se necesitan al menos 10 mediciones por punto para estimar la tendencia y el riesgo."),
+          f1(r.mediaProy) + " dB(A)", f0(100 * r.probModelo) + " %", (r.usarTendencia ? "tendencia" : "media histórica") + (r.n < 10 ? " (preliminar)" : "")]), [1, 3, 4])
+        : parrafo("Ninguna estación de monitoreo tiene todavía 5 mediciones en días distintos, que es el mínimo para estimar la tendencia y el riesgo (10 para un resultado firme)."),
       el("p", { class: "inf-nota", texto: "Modelo estadístico (regresión lineal con intervalo de predicción, o distribución normal de la media histórica cuando la tendencia no es significativa). Es una estimación, no una medición." })));
 
     // X. Evidencia fotografica
@@ -223,7 +224,8 @@
     const fotos = X.conFotos.slice(-MAX_FOTOS);
     fotos.forEach((m, i) => {
       const img = el("img", { alt: "Foto de " + m.punto, "data-ruta": m.fotos[0] });
-      rejilla.appendChild(el("figure", null, el("div", { class: "inf-foto-caja" }, img),
+      const rot = m.foto_sellada === false ? el("div", { class: "inf-rotulo" }, U.lineasRotulo(m).map((l) => el("div", { texto: l }))) : null;
+      rejilla.appendChild(el("figure", null, el("div", { class: "inf-foto-caja" }, img, rot),
         el("figcaption", { texto: "Foto " + (i + 1) + ". " + m.punto + " · " + fechaHora(m.ms) + " · Leq " + f1(m.leq) + " dB(A)" + (m.este !== null ? " · E " + f0(m.este) + " N " + f0(m.norte) : "") + " · " + m.proyecto })));
     });
     if (X.conFotos.length > MAX_FOTOS) fotosSec.appendChild(el("p", { class: "inf-nota", texto: "Se incluyen las " + MAX_FOTOS + " fotografías más recientes de " + X.conFotos.length + "." }));

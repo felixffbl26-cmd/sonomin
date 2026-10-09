@@ -1,6 +1,6 @@
 # SONOMIN en internet · guía paso a paso
 
-Idea y dirección: Ing. Lesmes Gabriel Calsina Paricahua · Desarrollo: Felix Fernando Bautista Layme
+Desarrollo: Felix Fernando Bautista Layme · Asesor: Ing. Lesmes Gabriel Calsina Paricahua
 
 Con esta carpeta el tablero de la computadora queda en un **enlace de internet**. El ingeniero, su jefe o quien usted autorice entra con correo y contraseña y ve, en tiempo real, las mediciones, las fotos, el análisis, los pronósticos y el cálculo de penalidades.
 
@@ -15,9 +15,18 @@ Con esta carpeta el tablero de la computadora queda en un **enlace de internet**
 | Clave anon (para el celular, es pública) | está en `docs/config.js` y en Supabase › Project Settings › API Keys › Legacy |
 | Administrador | felixffbl.26@gmail.com |
 
-**Cómo entra una persona nueva:** abre el enlace, pulsa «Solicitar acceso» y crea su cuenta. Usted la aprueba en la pestaña **Accesos** como lector (solo mira), celular (el teléfono que mide) o administrador. Sin su aprobación no ve nada.
+**Cómo entra una persona nueva:** abre el enlace, pulsa «Solicitar acceso» y crea su cuenta. Usted la aprueba en la pestaña **Accesos** como lector (solo mira), celular (el teléfono que mide) o administrador, y le asigna los proyectos que podrá ver. Sin su aprobación no ve nada; sin proyectos asignados, tampoco.
 
 **Qué se ve en tiempo real (sin recargar):** cada celular que está midiendo, con nivel cada 2 s, punto, proyecto, modo, coordenadas UTM y geográficas, avance de la medición y gráfico de 3 minutos; su posición y rastro en el mapa satelital; el registro de actividad al segundo (inicio, fin, mediciones guardadas, alertas de 85 dB(A) y del ECA) con sonido y notificación; el avance de cada proyecto frente a su plan; y la estadística completa (descriptiva, distribución, rangos por punto, mapa de calor día × hora, ANOVA y correlaciones).
+
+**Nuevo en la versión 5 (8 de octubre):**
+- **Seguridad por proyecto:** un lector o un celular solo ve los proyectos que usted le asigna en **Accesos › Asignar proyectos** (lo verifica la base de datos, no solo la página). No ve usuarios, registro ni otros proyectos. El administrador ve todo. Al aplicar la versión 5, **las cuentas lector y celular que ya existen no verán datos hasta que les asigne proyectos**.
+- **Pronóstico por estación:** une los tramos P-02-T001, P-02-M004… en la estación P-02; mínimo 5 mediciones (preliminar) y 10 (firme) en días distintos; dice cuántas faltan. Selector «Solo puntos fijos».
+- **Mapas:** ya no saltan cuando llegan datos, agrupan los puntos cercanos y tienen la lista «Ir a un punto» con buscador.
+- **Fotos:** si la app no pudo imprimir el rótulo, la página dibuja los datos sobre la foto (y lo dice).
+- **Diseño nuevo** igual al de la app, con modo claro, oscuro o del sistema (abajo a la izquierda; en el celular, en «Más»).
+- Créditos: Desarrollo, Felix Fernando Bautista Layme; Asesor, Ing. Lesmes Gabriel Calsina Paricahua.
+- La auditoría técnica completa está en `AUDITORIA_TECNICA.md`.
 
 **Nuevo en la versión 4 (4 de octubre):**
 - **Informe técnico al instante** en la pestaña Informes: pulse «Generar informe técnico» y luego «Imprimir / Guardar PDF». También «Descargar Excel». Usa el filtro de arriba (proyecto, periodo, ámbito).
@@ -105,7 +114,7 @@ En la app: **Más › Nube y tiempo real** y llene: URL del proyecto, clave anon
 
 ## Paso 5 · Compartir con el jefe
 
-Envíele el enlace de GitHub Pages y su correo y contraseña de Supabase (rol `lector`). Entra, ve todo y no puede borrar ni modificar nada.
+Envíele el enlace de GitHub Pages. Él pide acceso con su propio correo; usted lo aprueba como `lector` y le asigna sus proyectos. Ve esos proyectos en tiempo real y no puede borrar ni modificar nada.
 
 ---
 
@@ -117,7 +126,7 @@ Envíele el enlace de GitHub Pages y su correo y contraseña de Supabase (rol `l
 | Mapa | Puntos sobre imagen satelital con semáforo y superficie interpolada (solo superficie) |
 | Mediciones | Tabla ordenable y filtrable, detalle con fotos y memoria de cálculo, descarga CSV |
 | Análisis | Leq por punto, perfil horario, cumplimiento, superficie frente a interior, dosis diaria |
-| Pronóstico | Tendencia por punto con intervalo, probabilidad de superar un límite, simulador de dosis |
+| Pronóstico | Tendencia por estación de monitoreo con intervalo, probabilidad de superar un límite, cuántas mediciones faltan, simulador de dosis |
 | Penalidades | Calculadora OEFA (ambiental) y riesgo Osinergmin (ocupacional) por separado, valor esperado, fuentes con su estado |
 | Informes | Excel, PDF y figuras generados; descarga del CSV completo |
 

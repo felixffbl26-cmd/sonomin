@@ -33,7 +33,7 @@
         s.appendChild(sv("line", { x1: x(t), x2: x(t), y1: sup, y2: H - inf, class: "rej" }));
         s.appendChild(sv("text", { x: x(t), y: H - 6, "text-anchor": "middle" }, String(t)));
       });
-      [[82, "#fab219", "4 3"], [85, "#d03b3b", null]].forEach(([v, c, dash]) => { if (v > d0 && v < d1) s.appendChild(sv("line", { x1: x(v), x2: x(v), y1: sup, y2: H - inf, stroke: c, "stroke-width": 1.5, "stroke-dasharray": dash })); });
+      [[82, "#e69a0b", "4 3"], [85, "#e74c3c", null]].forEach(([v, c, dash]) => { if (v > d0 && v < d1) s.appendChild(sv("line", { x1: x(v), x2: x(v), y1: sup, y2: H - inf, stroke: c, "stroke-width": 1.5, "stroke-dasharray": dash })); });
       grupos.forEach((g, i) => {
         const y = sup + i * (alto + sep), cy = y + alto / 2, d = g.d, color = colorSem(N.semaforo(d.leq));
         const grupo = sv("g", { tabindex: 0 });

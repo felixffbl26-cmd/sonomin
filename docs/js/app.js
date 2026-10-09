@@ -24,7 +24,7 @@
       dlg.scrollTop = 0;
     },
     cerrarDialogo() { if (dlg.open) dlg.close(); },
-    verFoto(url) { $("#visor-img").src = url; $("#visor").showModal(); },
+    verFoto(url, pie) { $("#visor-img").src = url; $("#visor-pie").textContent = pie || ""; $("#visor").showModal(); },
     irA: (v) => cambiarVista(v),
     filtrarProyecto(p) { $("#f-proyecto").value = p; S.filtro.proyecto = $("#f-proyecto").value; pintar(true); },
     refrescar: () => pintar(true),
@@ -42,35 +42,42 @@
   S.conectadoReciente = function (v) { return Date.now() - (S.vivoRecibido.get(v.id) || 0) < RECIENTE_MS; };
 
   // -------------------------------------------------------------------- tema
+  // claro, oscuro o igual que el sistema; se recuerda en este navegador
   function aplicarTema(t) {
     if (t === "claro" || t === "oscuro") document.documentElement.setAttribute("data-tema", t);
     else document.documentElement.removeAttribute("data-tema");
     try { localStorage.setItem("sonomin_tema", t || ""); } catch (e) { /* sin almacenamiento */ }
+    document.querySelectorAll(".selector-tema button").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.tema || "") === (t || ""))));
   }
-  try { aplicarTema(localStorage.getItem("sonomin_tema") || ""); } catch (e) { /* ignorar */ }
-  $("#boton-tema").addEventListener("click", () => {
-    const actual = document.documentElement.getAttribute("data-tema");
-    const oscuroSistema = matchMedia("(prefers-color-scheme: dark)").matches;
-    const esOscuro = actual ? actual === "oscuro" : oscuroSistema;
-    aplicarTema(esOscuro ? "claro" : "oscuro");
-    pintar(true);
+  let temaInicial = "";
+  try { temaInicial = localStorage.getItem("sonomin_tema") || ""; } catch (e) { /* ignorar */ }
+  aplicarTema(temaInicial);
+  document.querySelectorAll(".selector-tema button").forEach((b) => b.addEventListener("click", () => {
+    aplicarTema(b.dataset.tema || "");
+    if (!$("#app").hidden) pintar(true);
+  }));
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (!document.documentElement.getAttribute("data-tema") && !$("#app").hidden) pintar(true);
   });
 
   // ----------------------------------------------------------------- alertas
   try { const g = JSON.parse(localStorage.getItem("sonomin_alertas") || "null"); if (g) Object.assign(S.alertas, g); } catch (e) { /* ignorar */ }
   function guardarAlertas() { try { localStorage.setItem("sonomin_alertas", JSON.stringify(S.alertas)); } catch (e) { /* ignorar */ } }
   function textoBotonAlertas() {
-    $("#boton-alertas").textContent = S.alertas.sonido ? "Alertas: sí" : "Alertas: no";
-    $("#boton-alertas").setAttribute("aria-pressed", String(S.alertas.sonido));
+    document.querySelectorAll(".accion-alertas").forEach((b) => {
+      b.querySelector("span").textContent = S.alertas.sonido ? "Alertas: sí" : "Alertas: no";
+      b.setAttribute("aria-pressed", String(S.alertas.sonido));
+      b.title = "Sonido y notificación cuando una medición llegue a 85 dB(A) o supere el ECA";
+    });
   }
-  $("#boton-alertas").addEventListener("click", async () => {
+  document.querySelectorAll(".accion-alertas").forEach((b) => b.addEventListener("click", async () => {
     S.alertas.sonido = !S.alertas.sonido;
     if (S.alertas.sonido && "Notification" in raiz && Notification.permission === "default") {
       try { S.alertas.aviso = (await Notification.requestPermission()) === "granted"; } catch (e) { /* sin permiso */ }
     } else if ("Notification" in raiz) S.alertas.aviso = Notification.permission === "granted";
     guardarAlertas(); textoBotonAlertas();
     mostrarAviso(S.alertas.sonido ? "Alertas activadas: sonará un aviso cuando una medición llegue a 85 dB(A) o supere el ECA." : "Alertas desactivadas.", "info");
-  });
+  }));
   textoBotonAlertas();
 
   let audio = null;
@@ -102,7 +109,7 @@
     if (!S.alertas.sonido) return;
     pitido();
     if (S.alertas.aviso && "Notification" in raiz && Notification.permission === "granted" && document.hidden) {
-      try { new Notification("SONOMIN · alerta de ruido", { body: texto, icon: "img/logo_una.png", tag: "sonomin-" + e.id }); } catch (x) { /* ignorar */ }
+      try { new Notification("SONOMIN · alerta de ruido", { body: texto, icon: "img/sonomin_192.png", tag: "sonomin-" + e.id }); } catch (x) { /* ignorar */ }
     }
   }
 
@@ -135,15 +142,42 @@
   });
 
   // ---------------------------------------------------------------- pestanas
+  const TITULOS = {
+    vivo: ["En vivo", "Celulares midiendo ahora, dónde están y la actividad al segundo"],
+    mapa: ["Mapa", "Mediciones georreferenciadas, mapa de ruido y celulares en campo"],
+    proyectos: ["Proyectos", "Avance de cada proyecto frente a su plan"],
+    mediciones: ["Mediciones", "Registro completo, detalle, fotos y papelera"],
+    analisis: ["Análisis", "Evaluación ocupacional y ambiental por punto"],
+    estadistica: ["Estadística", "Descriptiva, distribución, ANOVA y correlaciones"],
+    pronostico: ["Pronóstico", "Tendencia por estación de monitoreo y riesgo de superar el límite"],
+    penalidades: ["Penalidades", "Infracciones posibles y multas referenciales"],
+    informes: ["Informes", "Informe técnico al instante, Excel y descargas"],
+    accesos: ["Accesos", "Cuentas, roles y proyectos asignados"],
+    registro: ["Registro", "Auditoría: quién hizo qué y cuándo"],
+  };
+  const EN_BARRA = ["vivo", "mapa", "mediciones", "analisis"];
   function cambiarVista(v) {
     if (!raiz.SON_VISTAS[v] || ((v === "accesos" || v === "registro") && S.rol !== "admin")) v = "vivo";
     S.vista = v;
     document.querySelectorAll(".pestana").forEach((p) => p.setAttribute("aria-selected", p.dataset.vista === v ? "true" : "false"));
     document.querySelectorAll(".vista").forEach((s) => { s.hidden = s.id !== "vista-" + v; });
+    const t = TITULOS[v] || [v, ""];
+    $("#titulo-vista").textContent = t[0]; $("#sub-vista").textContent = t[1];
+    $("main").dataset.titulo = t[0];
+    document.title = t[0] + " · SONOMIN";
+    $("#boton-mas").classList.toggle("activo", !EN_BARRA.includes(v));
+    if ($("#hoja-mas").open) $("#hoja-mas").close();
     try { history.replaceState(null, "", "#" + v); } catch (e) { /* ignorar */ }
     pintar(false);
   }
-  document.querySelectorAll(".pestana").forEach((p) => p.addEventListener("click", () => cambiarVista(p.dataset.vista)));
+  document.querySelectorAll(".pestana").forEach((p) => p.addEventListener("click", () => { cambiarVista(p.dataset.vista); if (p.closest(".hoja, .inferior")) scrollTo(0, 0); }));
+  $("#boton-mas").addEventListener("click", () => $("#hoja-mas").showModal());
+  $("#cerrar-mas").addEventListener("click", () => $("#hoja-mas").close());
+  $("#hoja-mas").addEventListener("click", (e) => { if (e.target === $("#hoja-mas")) $("#hoja-mas").close(); });
+  $("#boton-filtros").addEventListener("click", () => {
+    const abierto = $("#filtros").classList.toggle("abierto");
+    $("#boton-filtros").setAttribute("aria-expanded", String(abierto));
+  });
 
   // Dibuja la vista activa; las demas se marcan como sucias y se dibujan al abrirlas.
   function pintar(todasSucias) {
@@ -280,7 +314,22 @@
     $("#aviso-demo").hidden = D.enNube;
     S.rol = sesion.rol || D.rol || "";
     document.querySelectorAll('[data-solo="admin"]').forEach((n) => { n.hidden = S.rol !== "admin"; });
-    $("#usuario-actual").textContent = (sesion.email || "") + (S.rol ? " · " + ({ admin: "administrador", lector: "lector", celular: "celular" }[S.rol] || S.rol) : "");
+    const nombreRol = { admin: "Administrador · ve todo", lector: "Lector", celular: "Celular" }[S.rol] || S.rol;
+    document.querySelectorAll(".usuario-correo").forEach((n) => { n.textContent = sesion.email || ""; });
+    document.querySelectorAll(".usuario-rol").forEach((n) => { n.textContent = nombreRol; });
+    S.misProyectos = null;
+    $("#aviso-proyectos").hidden = true;
+    if (S.rol && S.rol !== "admin") {
+      try { S.misProyectos = await D.misProyectos(); } catch (e) { S.misProyectos = null; }
+      if (S.misProyectos) {
+        const txt = S.misProyectos.length ? nombreRol + " · " + S.misProyectos.length + (S.misProyectos.length === 1 ? " proyecto" : " proyectos") : nombreRol + " · sin proyectos";
+        document.querySelectorAll(".usuario-rol").forEach((n) => { n.textContent = txt; n.title = S.misProyectos.join(", "); });
+        if (!S.misProyectos.length) {
+          $("#aviso-proyectos").textContent = "Su cuenta está aprobada, pero el administrador todavía no le asignó ningún proyecto. Por seguridad solo verá datos de los proyectos que le asignen" + (S.rol === "celular" ? " (y las mediciones que envíe este celular)." : ".");
+          $("#aviso-proyectos").hidden = false;
+        }
+      }
+    }
     try { await cargarTodo(); }
     catch (e) { $("#vista-vivo").replaceChildren(el("div", { class: "caja-aviso grave", texto: "No se pudieron cargar los datos: " + e.message })); }
     const inicial = (location.hash || "#vivo").slice(1);
@@ -341,7 +390,8 @@
     finally { boton.disabled = false; }
   });
 
-  $("#boton-salir").addEventListener("click", async () => {
+  document.querySelectorAll(".accion-salir").forEach((b) => b.addEventListener("click", async () => {
+    if ($("#hoja-mas").open) $("#hoja-mas").close();
     if (desuscribir) { desuscribir(); desuscribir = null; }
     await D.salir();
     S.todas = []; S.papelera = []; S.auditoria = null; S.vivos.clear(); S.hist.clear(); S.rastro.clear(); S.eventos = [];
@@ -349,7 +399,7 @@
     Object.values(raiz.SON_VISTAS).forEach((v) => { v.montada = false; });
     if (D.enNube) { $("#app").hidden = true; $("#pantalla-login").hidden = false; $("#login-clave").value = ""; mostrarFormulario("login"); }
     else location.reload();
-  });
+  }));
 
   (async function iniciar() {
     let s = null;

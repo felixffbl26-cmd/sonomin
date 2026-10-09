@@ -1,6 +1,6 @@
 # SONOMIN · monitoreo de ruido en minería en tiempo real
 
-Idea y dirección: **Ing. Lesmes Gabriel Calsina Paricahua** · Desarrollo: **Felix Fernando Bautista Layme** · FIM – UNA Puno
+Desarrollo: **Felix Fernando Bautista Layme** · Asesor: **Ing. Lesmes Gabriel Calsina Paricahua** · FIM – UNA Puno
 
 - `docs/` — tablero web (GitHub Pages). Entrar con la cuenta autorizada por el administrador.
 - `supabase/esquema.sql` — base de datos, seguridad por filas, tiempo real y gestión de accesos.

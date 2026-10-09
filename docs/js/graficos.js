@@ -31,7 +31,7 @@
     return e;
   }
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-  const colorSem = (s) => (s === "EXCEDE" ? "#d03b3b" : s === "PRECAUCION" ? "#fab219" : "#0ca30c");
+  const colorSem = (s) => (s === "EXCEDE" ? "#e74c3c" : s === "PRECAUCION" ? "#e69a0b" : "#1e9e57");
 
   // ------------------------------------------------------------ formatos
   const f0 = (x) => (Number.isFinite(x) ? x.toFixed(0) : "–");

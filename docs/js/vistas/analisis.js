@@ -22,10 +22,10 @@
     barras(gPuntos, {
       filas: pts.map((p) => ({ etiqueta: p.punto, valor: p.leq, color: colorSem(p.sem), detalle: [["Mediciones", p.n], ["Máximo", f1(p.max) + " dB(A)"], ["≥ 85 dB(A)", f1(p.pctSobreLimite) + " %"], ["Estado", U.TEXTO_SEM[p.sem]]] })),
       dominio: [30, Math.max(100, Math.ceil(maxV / 10) * 10)],
-      limites: [{ v: 82, etiqueta: "82 acción", color: "#fab219", dash: true }, { v: 85, etiqueta: "85 límite", color: "#d03b3b" }],
+      limites: [{ v: 82, etiqueta: "82 acción", color: "#e69a0b", dash: true }, { v: 85, etiqueta: "85 límite", color: "#e74c3c" }],
       ariaTitulo: "Leq por punto",
     });
-    gPuntos.after(raiz.SON_G.leyenda([{ caja: true, color: "#0ca30c", texto: "Conforme" }, { caja: true, color: "#fab219", texto: "Precaución" }, { caja: true, color: "#d03b3b", texto: "Excede" }]));
+    gPuntos.after(raiz.SON_G.leyenda([{ caja: true, color: "#1e9e57", texto: "Conforme" }, { caja: true, color: "#e69a0b", texto: "Precaución" }, { caja: true, color: "#e74c3c", texto: "Excede" }]));
 
     // 2. perfil horario + 3. cumplimiento
     const cum = A.cumplimiento(meds);
@@ -41,8 +41,8 @@
         el("p", { style: "margin-top:12px" }, el("b", { texto: "ECA ambiental: " }),
           cum.nEca ? cum.sobreEca + " de " + cum.nEca + " mediciones de superficie superan el ECA de su zona (" + f1(cum.pctSobreEca) + " %)." : "no hay mediciones de superficie con límite ECA."),
         el("p", { class: "mudo", style: "font-size:12.5px", texto: "Importante: superar el ECA es una alerta técnica; no es una infracción por sí mismo (Ley General del Ambiente, art. 31.4). Ver la pestaña Penalidades." }))));
-    columnas(gHora, { datos: perfil.map((b) => ({ x: b.h, valor: b.leq, n: b.n, etiqueta: String(b.h).padStart(2, "0") + ":00–" + String(b.h).padStart(2, "0") + ":59" })), dominio: [30, Math.max(100, Math.ceil(Math.max(...perfil.map((b) => b.leq ?? 0)) / 10) * 10)], limites: [{ v: 85, etiqueta: "85", color: "#d03b3b" }, { v: 82, etiqueta: "82", color: "#fab219", dash: true }], etiquetaX: (d) => d.x, alto: 210 });
-    apilada(gCum, { partes: [{ etiqueta: "Conforme", valor: cum.sem.CONFORME, color: "#0ca30c" }, { etiqueta: "Precaución", valor: cum.sem.PRECAUCION, color: "#fab219" }, { etiqueta: "Excede", valor: cum.sem.EXCEDE, color: "#d03b3b" }] });
+    columnas(gHora, { datos: perfil.map((b) => ({ x: b.h, valor: b.leq, n: b.n, etiqueta: String(b.h).padStart(2, "0") + ":00–" + String(b.h).padStart(2, "0") + ":59" })), dominio: [30, Math.max(100, Math.ceil(Math.max(...perfil.map((b) => b.leq ?? 0)) / 10) * 10)], limites: [{ v: 85, etiqueta: "85", color: "#e74c3c" }, { v: 82, etiqueta: "82", color: "#e69a0b", dash: true }], etiquetaX: (d) => d.x, alto: 210 });
+    apilada(gCum, { partes: [{ etiqueta: "Conforme", valor: cum.sem.CONFORME, color: "#1e9e57" }, { etiqueta: "Precaución", valor: cum.sem.PRECAUCION, color: "#e69a0b" }, { etiqueta: "Excede", valor: cum.sem.EXCEDE, color: "#e74c3c" }] });
 
     // 4. superficie vs interior
     const filasAmb = ["SUPERFICIE", "INTERIOR"].map((a) => {

@@ -6,7 +6,7 @@
   const U = raiz.SON_U, A = raiz.SON_ANALISIS, N = raiz.SON_NORMAS;
   raiz.SON_VISTAS = raiz.SON_VISTAS || {};
 
-  let refs = {}, mapa = null, capas = null, ultimoPintado = 0, pendiente = null, filtroEv = "todo", encuadrado = false;
+  let refs = {}, mapa = null, ultimoPintado = 0, pendiente = null, filtroEv = "todo", encuadrado = false;
   const dos = (n) => String(n).padStart(2, "0");
   const horaSeg = (ms) => { const h = N.horaLima(ms); const s = Math.floor((ms / 1000) % 60); return dos(h.h) + ":" + dos(h.m) + ":" + dos(s); };
   const inicioHoy = () => Date.parse(N.horaLima(Date.now()).dia + "T05:00:00Z");
@@ -89,7 +89,7 @@
       if (h.length >= 2) requestAnimationFrame(() => linea(graf, {
         series: [{ nombre: "Nivel", color: colorEquipo(S, v.id), puntos: h.map((p) => ({ x: p.x, y: p.y, detalle: [p.punto || ""] })) }],
         dominioY: [40, 110], tiempo: true, alto: 120, xMin: Date.now() - 180000, xMax: Date.now(), areaBajo: true,
-        limites: [{ v: 82, etiqueta: "82", color: "#fab219", dash: true }, { v: 85, etiqueta: "85", color: "#d03b3b" }],
+        limites: [{ v: 82, etiqueta: "82", color: "#e69a0b", dash: true }, { v: 85, etiqueta: "85", color: "#e74c3c" }],
       }));
       else graf.appendChild(el("p", { class: "mudo", style: "font-size:12px", texto: "El gráfico de los últimos 3 minutos aparece con los siguientes datos." }));
     }
@@ -114,53 +114,68 @@
   }
 
   // ---------------------------------------------------------------- mapa
-  function iconoEquipo(color, midiendo) {
-    return L.divIcon({ className: "", iconSize: [18, 18], iconAnchor: [9, 9], html: '<div class="marcador-equipo' + (midiendo ? " midiendo" : "") + '" style="background:' + color + '"></div>' });
-  }
+  // El mapa se crea una vez por visita a la pestaña y despues solo se actualiza:
+  // no se vuelve a encuadrar solo, no cierra el globo abierto y no parpadea.
+  const M = raiz.SON_MAPAS;
+  let medidas = null, equipos = null, firmaMedidas = "";
   function centrar(v) {
-    if (!mapa) return;
-    const ll = posEquipo(v); if (!ll) return;
-    mapa.setView(ll, Math.max(mapa.getZoom(), 17));
+    if (!mapa || !equipos) return;
+    equipos.ir(v.id);
     refs.mapaCaja.scrollIntoView({ behavior: "smooth", block: "center" });
   }
+  function pintarMedidas(S, forzar) {
+    if (!medidas) return;
+    const p = S.filtro.proyecto, desde = inicioHoy();
+    const hoy = S.todas.filter((m) => (m.ms || 0) >= desde && m.lat !== null && m.lon !== null && Number.isFinite(m.leq) && (!p || m.proyecto === p));
+    const firma = hoy.length + "|" + (hoy[0] ? hoy[0].uuid : "") + "|" + p;
+    if (!forzar && firma === firmaMedidas) return;
+    firmaMedidas = firma;
+    medidas.poner(hoy.map((m) => ({ clave: m.uuid, lat: m.lat, lon: m.lon, leq: m.leq, titulo: m.punto,
+      detalle: [fechaHora(m.ms) + " · " + (MODO[m.modo] || m.modo || ""), m.proyecto], alAbrir: () => raiz.SON_UI.abrirMedicion && raiz.SON_UI.abrirMedicion(m) })));
+  }
   function pintarMapa(S) {
-    if (!mapa) return;
-    capas.equipos.clearLayers(); capas.rastros.clearLayers(); capas.medidas.clearLayers();
-    const p = S.filtro.proyecto, desde = inicioHoy(), limites = [];
-    S.todas.filter((m) => (m.ms || 0) >= desde && m.lat !== null && m.lon !== null && Number.isFinite(m.leq) && (!p || m.proyecto === p)).forEach((m) => {
-      const c = L.circleMarker([m.lat, m.lon], { radius: 6, color: "#ffffff", weight: 2, fillColor: colorSem(N.semaforo(m.leq)), fillOpacity: 0.95 });
-      c.bindTooltip(m.punto + " · " + f1(m.leq) + " dB(A) · " + fechaHora(m.ms), { direction: "top" });
-      c.on("click", () => raiz.SON_UI.abrirMedicion && raiz.SON_UI.abrirMedicion(m));
-      c.addTo(capas.medidas); limites.push([m.lat, m.lon]);
-    });
-    equiposVisibles(S).forEach((v, iv) => {
-      const color = colorEquipo(S, v.id);
-      const r = (S.rastro.get(v.id) || []).filter((q) => q[3] >= Date.now() - 12 * 3600000);
-      if (r.length >= 2) L.polyline(r.map((q) => [q[0], q[1]]), { color, weight: 3, opacity: 0.85 }).addTo(capas.rastros);
-      const ll = posEquipo(v);
-      if (!ll) return;
-      const midiendo = S.activos().includes(v);
-      const mk = L.marker(ll, { icon: iconoEquipo(color, midiendo), zIndexOffset: 1000 });
-      mk.bindTooltip((v.dispositivo || "Celular") + (midiendo ? " · " + f0(Number(v.nivel_dba)) + " dB(A)" : " · sin medir") + " · " + (v.punto || ""), { direction: iv % 2 ? "bottom" : "top", permanent: midiendo, offset: [0, iv % 2 ? 10 : -10] });
-      mk.bindPopup(el("div", { style: "min-width:200px" }, el("b", { texto: v.dispositivo || "Celular" }), el("br"),
-        el("span", { texto: (v.proyecto || "") + " · " + (v.punto || "") }), el("br"),
-        el("span", { class: "mudo", texto: midiendo ? "Nivel " + f1(Number(v.nivel_dba)) + " dB(A) · Leq parcial " + f1(Number(v.leq_parcial)) : "No está midiendo" }), el("br"),
-        el("span", { class: "mudo", texto: ll[0].toFixed(6) + ", " + ll[1].toFixed(6) })));
-      mk.addTo(capas.equipos); limites.push(ll);
-    });
-    if (!encuadrado && limites.length) { mapa.fitBounds(L.latLngBounds(limites).pad(0.3), { maxZoom: 18 }); encuadrado = true; }
+    if (!mapa || !equipos) return;
+    pintarMedidas(S, false);
+    equipos.actualizar(equiposVisibles(S).map((v) => {
+      const midiendo = S.activos().includes(v), ll = posEquipo(v);
+      return {
+        id: v.id, ll, color: colorEquipo(S, v.id), midiendo,
+        etiqueta: (v.dispositivo || "Celular") + (midiendo ? " · " + f0(Number(v.nivel_dba)) + " dB(A)" : " · sin medir") + (v.punto ? " · " + v.punto : ""),
+        rastro: (S.rastro.get(v.id) || []).filter((q) => q[3] >= Date.now() - 12 * 3600000).map((q) => [q[0], q[1]]),
+        popup: () => el("div", { style: "min-width:200px" }, el("b", { texto: v.dispositivo || "Celular" }), el("br"),
+          el("span", { texto: (v.proyecto || "") + " · " + (v.punto || "") }), el("br"),
+          el("span", { class: "mudo", texto: midiendo ? "Nivel " + f1(Number(v.nivel_dba)) + " dB(A) · Leq parcial " + f1(Number(v.leq_parcial)) : "No está midiendo" }), el("br"),
+          el("span", { class: "mudo", texto: ll ? ll[0].toFixed(6) + ", " + ll[1].toFixed(6) : "" })),
+      };
+    }));
+    if (!encuadrado) {
+      const lim = medidas.limites().concat(equipos.posiciones().map((x) => [x.lat, x.lng]));
+      if (lim.length) { M.encuadrar(mapa, lim); encuadrado = true; }
+    }
   }
   function montarMapa(S) {
     if (mapa) { mapa.remove(); mapa = null; }
-    encuadrado = false;
-    mapa = L.map(refs.mapaCaja, { zoomControl: true, scrollWheelZoom: false }).setView([-15.84, -70.02], 16);
-    const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "Imágenes © Esri, Maxar, Earthstar Geographics" });
-    const calle = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© colaboradores de OpenStreetMap" });
-    sat.addTo(mapa);
-    capas = { medidas: L.featureGroup().addTo(mapa), rastros: L.featureGroup().addTo(mapa), equipos: L.featureGroup().addTo(mapa) };
-    L.control.layers({ "Satélite": sat, "Calles": calle }, { "Mediciones de hoy": capas.medidas, "Rastro (12 h)": capas.rastros, "Celulares": capas.equipos }, { collapsed: true }).addTo(mapa);
+    const m = M.crear(refs.mapaCaja, "vivo", { rueda: false });
+    mapa = m.mapa;
+    encuadrado = m.tieneVista; firmaMedidas = "";
+    medidas = M.capaAgrupada(mapa, { radioPunto: 6, radio: 30, textoAbrir: "Ver la medición" });
+    equipos = M.capaEquipos(mapa);
+    const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 21, maxNativeZoom: 19, attribution: "Imágenes © Esri, Maxar, Earthstar Geographics" });
+    const calle = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 21, maxNativeZoom: 19, attribution: "© colaboradores de OpenStreetMap" });
+    m.fondo("ninguno"); sat.addTo(mapa);
+    L.control.layers({ "Satélite": sat, "Calles": calle }, { "Mediciones de hoy": medidas.capa, "Rastro (12 h)": equipos.capaR, "Celulares": equipos.capaE }, { collapsed: true }).addTo(mapa);
     pintarMapa(S);
-    setTimeout(() => mapa && mapa.invalidateSize(), 150);
+  }
+  function barraMapa(S) {
+    const sel = el("select", { "aria-label": "Ir a un celular", style: "min-width:0" }, el("option", { value: "", texto: "Ir a un celular…" }),
+      equiposVisibles(S).filter((v) => posEquipo(v)).map((v) => el("option", { value: v.id, texto: (v.dispositivo || v.id) + (S.activos().includes(v) ? " · midiendo" : "") })));
+    sel.addEventListener("change", () => { if (sel.value && equipos) equipos.ir(sel.value); sel.value = ""; });
+    return el("div", { class: "fila", style: "margin:8px 0" },
+      el("button", { class: "boton sec", type: "button", style: "padding:6px 12px", onclick: () => {
+        if (!mapa) return;
+        M.encuadrar(mapa, medidas.limites().concat(equipos.posiciones().map((x) => [x.lat, x.lng])));
+      } }, "Encuadrar todo"), sel,
+      el("span", { class: "mudo", style: "font-size:12.5px", texto: "Acerque con + y − o con doble clic. Los círculos con número agrupan mediciones cercanas: púlselos para separarlas." }));
   }
 
   // ----------------------------------------------------------- actividad
@@ -202,7 +217,7 @@
     else {
       const sem = N.semaforo(m.leq);
       cont.append(
-        el("div", { class: "foto-grande", style: "margin-top:10px" }, U.foto(m.fotos[0], "Foto de " + m.punto)),
+        el("div", { class: "foto-grande", style: "margin-top:10px" }, U.foto(m.fotos[0], "Foto de " + m.punto, m)),
         el("div", { class: "fila", style: "margin-top:10px" }, el("span", { class: "resultado-grande c-" + sem, texto: f1(m.leq) + " dB(A)" }), U.pill(sem)),
         el("p", { style: "margin-top:6px" }, el("b", { texto: m.punto }), " · ", MODO[m.modo] || m.modo || "", " · ", m.ambito || ""),
         el("p", { class: "mudo", texto: fechaHora(m.ms) + " (" + U.hace(m.ms) + ") · " + f0(m.dur) + " s · Lmax " + f1(m.lmax) + " · " + m.proyecto }),
@@ -211,7 +226,7 @@
     }
     const conFoto = S.filtradas.filter((x) => x.fotos.length).slice(0, 14);
     const tira = el("div", { class: "tira" });
-    conFoto.forEach((x) => tira.appendChild(el("figure", null, U.foto(x.fotos[0], "Foto de " + x.punto), el("figcaption", { texto: x.punto + " · " + f1(x.leq) + " dB(A) · " + fechaHora(x.ms) }))));
+    conFoto.forEach((x) => tira.appendChild(el("figure", null, U.foto(x.fotos[0], "Foto de " + x.punto, x), el("figcaption", { texto: x.punto + " · " + f1(x.leq) + " dB(A) · " + fechaHora(x.ms) }))));
     const v = S.filtradas.filter((x) => x.leq !== null);
     const conAviso = v.filter((x) => A.calidad(x).length);
     refs.ultima.replaceChildren(el("div", { class: "rejilla cols-65" },
@@ -242,17 +257,18 @@
       el("div", { class: "rejilla cols-65 seccion" },
         el("div", { class: "tarjeta" }, el("h2", { texto: "Dónde están midiendo" }),
           el("p", { class: "sub", texto: "Celulares en tiempo real (círculo con borde blanco; late cuando está midiendo), su rastro de las últimas 12 horas y las mediciones de hoy coloreadas por semáforo." }),
-          refs.mapaCaja,
+          refs.barraMapa = el("div"), refs.mapaCaja,
           el("div", { class: "leyenda-mapa", style: "margin-top:8px" },
-            el("span", null, el("span", { class: "cuadro", style: "background:#0ca30c" }), "Conforme (menos de 82)  "),
-            el("span", null, el("span", { class: "cuadro", style: "background:#fab219" }), "Precaución (82 a 85)  "),
-            el("span", null, el("span", { class: "cuadro", style: "background:#d03b3b" }), "Excede (85 o más) · dB(A)"))),
+            el("span", null, el("span", { class: "cuadro", style: "background:#1e9e57" }), "Conforme (menos de 82)  "),
+            el("span", null, el("span", { class: "cuadro", style: "background:#e69a0b" }), "Precaución (82 a 85)  "),
+            el("span", null, el("span", { class: "cuadro", style: "background:#e74c3c" }), "Excede (85 o más) · dB(A)"))),
         el("div", { class: "tarjeta" }, el("div", { class: "fila", style: "justify-content:space-between" }, el("h2", { texto: "Actividad al segundo" }), selEv),
           el("p", { class: "sub", texto: "Inicio y fin de cada medición, mediciones guardadas y alertas. Queda registrado en el servidor aunque nadie tenga abierta esta página." }),
           refs.lista)),
       refs.ultima));
 
     pintarKpis(S); pintarEquipos(S); pintarActividad(S); pintarUltima(S);
+    refs.barraMapa.replaceChildren(barraMapa(S));
     montarMapa(S);
   }
 
@@ -269,6 +285,6 @@
       refs.lista.prepend(itemEvento(S, e, true));
       while (refs.lista.children.length > 120) refs.lista.lastChild.remove();
     },
-    alMedicion(S) { pintarKpis(S); pintarUltima(S); pintarMapa(S); },
+    alMedicion(S) { pintarKpis(S); pintarUltima(S); pintarMedidas(S, true); },
   };
 })(window);
