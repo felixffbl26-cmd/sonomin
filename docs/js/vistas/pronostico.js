@@ -57,7 +57,7 @@
     const nodo = el("div");
 
     // ---------------------------------------------------------------- controles
-    const selPunto = el("select", { "aria-label": "Estación" }, pts.map((x) => el("option", { value: x.clave, texto: x.punto + " · " + x.n + " med. · " + x.dias + (x.dias === 1 ? " día" : " días") + (x.n < MIN_PRELIMINAR ? " (insuficiente)" : ""), selected: x.clave === estado.clave })));
+    const selPunto = el("select", { "aria-label": "Estación" }, pts.map((x) => el("option", { value: x.clave, texto: x.punto + (S.filtro.proyecto ? "" : " (" + x.proyecto + ")") + " · " + x.n + " med. · " + x.dias + (x.dias === 1 ? " día" : " días") + (x.n < MIN_PRELIMINAR ? " (insuficiente)" : ""), selected: x.clave === estado.clave })));
     const selDias = el("select", { "aria-label": "Horizonte" }, [7, 30, 90].map((d) => el("option", { value: d, texto: d + " días", selected: d === estado.dias })));
     const selLim = el("select", { "aria-label": "Límite" }, Object.entries(LIMITES).map(([k, t]) => el("option", { value: k, texto: t, selected: k === estado.limite })));
     selPunto.addEventListener("change", () => { estado.clave = selPunto.value; render(cont, S); });
@@ -87,7 +87,7 @@
       cuerpo.appendChild(el("div", { class: "rejilla cols-4" },
         U.kpi("Leq medio de la estación", f1(r.mu) + " dB(A)", "desviación " + f1(r.sd) + " dB · n = " + r.n, "c-" + N.semaforo(r.mu)),
         U.kpi("Tendencia", tr.suficiente ? (tr.b >= 0 ? "+" : "") + f2(tr.b) + " dB/día" : "–", tr.suficiente ? "IC 95 %: " + f2(tr.ic95[0]) + " a " + f2(tr.ic95[1]) + " · p = " + (tr.p < 0.001 ? "< 0.001" : tr.p.toFixed(3)) + (signif ? " (significativa)" : " (no significativa)") : "datos insuficientes"),
-        U.kpi("Nivel esperado en " + estado.dias + " días", f1(r.mediaProy) + " dB(A)", (r.usarTendencia ? "usa la tendencia (significativa)" : r.horizonteLargo && tr.p < 0.05 ? "la tendencia no se extrapola más allá de los " + f0(tr.diasObservados) + " días observados: se usa el promedio" : "sin tendencia significativa: se usa el promedio") + " · ±" + f1(1.96 * r.sdProy) + " dB al 95 %", "c-" + N.semaforo(r.mediaProy)),
+        U.kpi("Nivel esperado en " + estado.dias + " días", f1(r.mediaProy) + " dB(A)", (r.usarTendencia ? "usa la tendencia (significativa)" : tr.suficiente && tr.p < 0.05 && tr.diasObservados < 2 ? "hay menos de 2 días de datos: la tendencia aún no se usa y se toma el promedio" : r.horizonteLargo && tr.p < 0.05 ? "la tendencia no se extrapola más allá de los " + f0(tr.diasObservados) + " días observados: se usa el promedio" : "sin tendencia significativa: se usa el promedio") + " · ±" + f1(1.96 * r.sdProy) + " dB al 95 %", "c-" + N.semaforo(r.mediaProy)),
         U.kpi("Probabilidad de superar", pct(r.probModelo), "límite: " + prep.etiqueta + " · observado: " + r.k + " de " + r.n + " (" + pct(r.propEmpirica) + ", IC 95 %: " + pct(r.propIC[0]) + " a " + pct(r.propIC[1]) + ")", r.probModelo >= 0.5 ? "c-EXCEDE" : r.probModelo >= 0.1 ? "c-PRECAUCION" : "c-CONFORME")));
 
       // grafico: puntos + recta + banda
@@ -128,10 +128,10 @@
       el("div", { class: "tabla-caja" }, el("table", null,
         el("thead", null, el("tr", null, ["Estación", "n", "Días", "Leq medio", "Tendencia dB/día", "Esperado", "Prob. de superar", "Observado"].map((t, i) => el("th", { class: i ? "num" : "", texto: t })))),
         el("tbody", null, filasRiesgo.map(({ x, r: rr }) => rr.suficiente
-          ? el("tr", null, el("td", null, x.punto, rr.n < MIN_FIRME ? el("div", { class: "faltan", texto: faltanTexto(rr.n) }) : null), el("td", { class: "num", texto: String(rr.n) }), el("td", { class: "num", texto: String(x.dias) }), el("td", { class: "num", texto: f1(rr.mu) }),
+          ? el("tr", null, el("td", null, x.punto, S.filtro.proyecto ? null : el("div", { class: "faltan", texto: x.proyecto }), rr.n < MIN_FIRME ? el("div", { class: "faltan", texto: faltanTexto(rr.n) }) : null), el("td", { class: "num", texto: String(rr.n) }), el("td", { class: "num", texto: String(x.dias) }), el("td", { class: "num", texto: f1(rr.mu) }),
             el("td", { class: "num", texto: rr.tendencia.suficiente ? (rr.tendencia.b >= 0 ? "+" : "") + f2(rr.tendencia.b) + (rr.tendencia.p < 0.05 ? " *" : "") : "–" }),
             el("td", { class: "num", texto: f1(rr.mediaProy) }), el("td", { class: "num c-" + (rr.probModelo >= 0.5 ? "EXCEDE" : rr.probModelo >= 0.1 ? "PRECAUCION" : "CONFORME"), texto: (rr.probModelo * 100).toFixed(1) + " %" }), el("td", { class: "num", texto: rr.k + " de " + rr.n }))
-          : el("tr", null, el("td", { texto: x.punto }), el("td", { class: "num", texto: String(rr.n) }), el("td", { class: "num", texto: String(x.dias) }),
+          : el("tr", null, el("td", null, x.punto, S.filtro.proyecto ? null : el("div", { class: "faltan", texto: x.proyecto })), el("td", { class: "num", texto: String(rr.n) }), el("td", { class: "num", texto: String(x.dias) }),
               el("td", { colspan: 5 }, el("span", { class: "barra-faltan" }, el("i", { style: "width:" + Math.round((100 * rr.n) / MIN_PRELIMINAR) + "%" })), el("span", { class: "faltan", texto: faltanTexto(rr.n) })))))),
         el("p", { class: "mudo", style: "font-size:12px;margin-top:6px", texto: "* tendencia estadísticamente significativa (p < 0.05)." }))));
 
