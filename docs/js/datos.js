@@ -412,6 +412,72 @@
     return () => clearInterval(id);
   }
 
+  // ------------------------------------------------------------ alertas del administrador
+  // Quienes deberian recibir una alerta: los celulares y lectores aprobados (todos, de un proyecto o una persona).
+  D.destinatariosAlerta = function (a, usuarios) {
+    const base = (usuarios || []).filter((u) => u.rol === "celular" || u.rol === "lector");
+    if (a.destino_tipo === "PERSONA") return (usuarios || []).filter((u) => u.user_id === a.destino_usuario);
+    if (a.destino_tipo === "PROYECTO") return base.filter((u) => (u.proyectos || []).includes(a.destino_proyecto));
+    return base;
+  };
+
+  const oyentesAlertas = new Set();
+  let canalAlertas = null;
+  const emitirAlertas = (tipo, fila) => oyentesAlertas.forEach((f) => { try { f(tipo, fila); } catch (e) { console.error(e); } });
+  D._alertasDemo = []; D._lecturasDemo = [];
+
+  D.enviarAlerta = async function (a) {
+    if (!enNube) {
+      const ahora = Date.now(), id = "demo-al-" + ahora.toString(36);
+      const usuarios = await D.usuarios();
+      const persona = a.tipo === "PERSONA" ? usuarios.find((u) => u.user_id === a.usuario) : null;
+      const fila = { id, creado: new Date(ahora).toISOString(), vence: new Date(ahora + (a.horas || 12) * 3600000).toISOString(), titulo: a.titulo, mensaje: a.mensaje,
+        nivel: a.nivel, destino_tipo: a.tipo, destino_proyecto: a.tipo === "PROYECTO" ? a.proyecto : null, destino_usuario: a.tipo === "PERSONA" ? a.usuario : null,
+        destino_email: persona ? persona.email : null, creada_por: null, creada_por_email: "demostración" };
+      D._alertasDemo.unshift(fila);
+      auditarDemo("ALERTA_ENVIADA", persona ? persona.email : a.proyecto || "TODOS", { alerta: id, titulo: a.titulo, nivel: a.nivel, destino: a.tipo });
+      emitirAlertas("alerta", fila);
+      // simulacion: cada destinatario recibe y la mayoria la lee unos segundos despues
+      D.destinatariosAlerta(fila, usuarios).forEach((u, i) => {
+        const ponerLectura = (extra) => {
+          const l = { alerta_id: id, usuario_id: u.user_id, usuario_email: u.email, dispositivo: "Celular demo", recibida: true, recibido_en: new Date().toISOString(), leida: false, leido_en: null, ...extra };
+          const k = D._lecturasDemo.findIndex((x) => x.alerta_id === id && x.usuario_id === u.user_id);
+          if (k >= 0) D._lecturasDemo[k] = { ...D._lecturasDemo[k], ...l, recibido_en: D._lecturasDemo[k].recibido_en }; else D._lecturasDemo.push(l);
+          emitirAlertas("lectura", D._lecturasDemo.find((x) => x.alerta_id === id && x.usuario_id === u.user_id));
+        };
+        setTimeout(() => ponerLectura({}), 1200 + i * 700);
+        if (i % 3 !== 2) setTimeout(() => ponerLectura({ leida: true, leido_en: new Date().toISOString() }), 4500 + i * 1700);
+      });
+      return id;
+    }
+    return exigir(await D.cliente.rpc("enviar_alerta", { p_titulo: a.titulo, p_mensaje: a.mensaje, p_nivel: a.nivel, p_tipo: a.tipo,
+      p_proyecto: a.proyecto || null, p_usuario: a.usuario || null, p_horas: a.horas || 12 }));
+  };
+
+  D.alertas = async function () {
+    if (!enNube) return { alertas: D._alertasDemo.slice(), lecturas: D._lecturasDemo.slice() };
+    const [al, le] = await Promise.all([
+      D.cliente.from("alertas").select("*").order("creado", { ascending: false }).limit(50),
+      D.cliente.from("alertas_lecturas").select("*").order("recibido_en", { ascending: false }).limit(2000),
+    ]);
+    return { alertas: exigir(al), lecturas: exigir(le) };
+  };
+
+  /** fn(tipo, fila): tipo "alerta" (alertas) o "lectura" (alertas_lecturas). El canal solo existe mientras haya quien escuche. */
+  D.escucharAlertas = function (fn) {
+    oyentesAlertas.add(fn);
+    if (enNube && !canalAlertas) {
+      canalAlertas = D.cliente.channel("sonomin-alertas-" + Math.random().toString(36).slice(2))
+        .on("postgres_changes", { event: "*", schema: "public", table: "alertas" }, (p) => p.new && p.new.id && emitirAlertas("alerta", p.new))
+        .on("postgres_changes", { event: "*", schema: "public", table: "alertas_lecturas" }, (p) => p.new && p.new.alerta_id && emitirAlertas("lectura", p.new))
+        .subscribe();
+    }
+    return () => {
+      oyentesAlertas.delete(fn);
+      if (!oyentesAlertas.size && canalAlertas) { D.cliente.removeChannel(canalAlertas); canalAlertas = null; }
+    };
+  };
+
   D.enNube = enNube;
   raiz.SON_DATOS = D;
 })(window);
