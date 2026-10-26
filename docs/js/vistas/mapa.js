@@ -91,7 +91,7 @@
       const midiendo = S.activos().includes(v);
       return {
         id: v.id, ll, color: colores[ids.indexOf(v.id) % colores.length], midiendo,
-        etiqueta: (v.dispositivo || "Celular") + " · " + (midiendo ? f0(Number(v.nivel_dba)) + " dB(A)" : "sin medir") + (v.punto ? " · " + v.punto : ""),
+        etiqueta: (v.dispositivo || "Celular") + " · " + (midiendo ? f0(Number(v.nivel_dba)) + " dB(A)" : v.compartiendo ? "ubicación compartida" : "sin medir") + (v.punto ? " · " + v.punto : ""),
         rastro: (S.rastro.get(v.id) || []).filter((q) => q[3] >= Date.now() - 12 * 3600000).map((q) => [q[0], q[1]]),
         popup: () => el("div", null, el("b", { texto: v.dispositivo || "Celular" }), el("div", { class: "mudo", texto: (v.proyecto || "") + " · " + (v.punto || "") })),
       };

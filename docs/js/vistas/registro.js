@@ -19,10 +19,11 @@
     PLAN_PROYECTO_BORRADO: { t: "Plan de proyecto borrado", g: "proyectos" },
     INFORME_GENERADO: { t: "Informe técnico generado", g: "informes" },
     INFORME_AUTOMATICO: { t: "Informe automático (GitHub)", g: "informes" },
+    ALERTA_ENVIADA: { t: "Alerta enviada a los celulares", g: "alertas" },
     EXPORTACION_CSV: { t: "Descarga de datos (CSV)", g: "informes" },
     EXPORTACION_EXCEL: { t: "Descarga de datos (Excel)", g: "informes" },
   };
-  const GRUPOS = [["", "Toda la actividad"], ["ingresos", "Ingresos al tablero"], ["mediciones", "Papelera y borrados"], ["accesos", "Accesos y roles"], ["proyectos", "Planes de proyecto"], ["informes", "Informes y descargas"]];
+  const GRUPOS = [["", "Toda la actividad"], ["ingresos", "Ingresos al tablero"], ["mediciones", "Papelera y borrados"], ["accesos", "Accesos y roles"], ["proyectos", "Planes de proyecto"], ["informes", "Informes y descargas"], ["alertas", "Alertas enviadas"]];
   const estado = { grupo: "", texto: "", dias: 30 };
   const dos = (n) => String(n).padStart(2, "0");
   const fechaSeg = (iso) => { const ms = Date.parse(iso), h = N.horaLima(ms); return h.dia.split("-").reverse().join("/") + " " + dos(h.h) + ":" + dos(h.m) + ":" + dos(Math.floor(ms / 1000) % 60); };
@@ -40,6 +41,7 @@
         return [d.estado, d.objetivo_puntos ? "meta " + d.objetivo_puntos + " puntos" : "", d.objetivo_mediciones ? d.objetivo_mediciones + " mediciones" : "", d.fecha_fin ? "hasta " + d.fecha_fin : ""].filter(Boolean).join(" · ");
       case "INFORME_GENERADO": return [d.proyecto || "todos los proyectos", d.mediciones !== undefined ? d.mediciones + " mediciones" : "", d.fotos !== undefined ? d.fotos + " fotos" : ""].filter(Boolean).join(" · ");
       case "INFORME_AUTOMATICO": return [d.proyecto || "todos los proyectos", d.n_mediciones !== undefined ? d.n_mediciones + " mediciones" : ""].filter(Boolean).join(" · ");
+      case "ALERTA_ENVIADA": return [d.nivel, d.destino, d.titulo ? "«" + d.titulo + "»" : ""].filter(Boolean).join(" · ");
       case "EXPORTACION_CSV": case "EXPORTACION_EXCEL": return d.filas !== undefined ? d.filas + " filas" : "";
       default: return JSON.stringify(d).slice(0, 160);
     }
