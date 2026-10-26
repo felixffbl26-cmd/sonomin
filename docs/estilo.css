@@ -563,3 +563,14 @@ tr.fila-nueva td { animation: resalte 2.5s ease-out; }
   .inf-anexo { break-before: page; }
 }
 .leaflet-container:focus, .leaflet-container:focus-visible { outline: none; }
+
+/* ---- alertas del administrador */
+.nivel-al { display: inline-block; font-size: 11.5px; font-weight: 800; padding: 2px 9px; border-radius: 999px; }
+.nivel-al.INFORMATIVA { color: var(--azul-texto); background: var(--azul-suave); }
+.nivel-al.ADVERTENCIA { color: var(--ambar-texto); background: var(--ambar-suave); }
+.nivel-al.URGENTE { color: #fff; background: var(--rojo); }
+.estado-al { font-weight: 700; font-size: 13px; }
+.estado-al.LEIDA { color: var(--verde-oscuro); }
+.estado-al.RECIBIDA { color: var(--ambar-texto); }
+.estado-al.PENDIENTE, .estado-al.VENCIDA { color: var(--rojo-texto); }
+.tipo-ev.ALERTA_VIVO { color: #fff; background: var(--rojo); }
