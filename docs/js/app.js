@@ -104,7 +104,8 @@
   }
 
   function alertar(e) {
-    const texto = (e.tipo === "ALERTA_ECA" ? "Supera el ECA · " : "≥ 85 dB(A) · ") + (e.punto || "") + " · " + Number(e.nivel_dba).toFixed(1) + " dB(A) · " + (e.proyecto || "");
+    const prefijo = e.tipo === "ALERTA_ECA" ? "Supera el ECA · " : e.tipo === "ALERTA_VIVO" ? "EN VIVO ≥ 85 dB(A) · " + (e.dispositivo || e.evaluador || "celular") + " · " : "≥ 85 dB(A) · ";
+    const texto = prefijo + (e.punto || "") + " · " + Number(e.nivel_dba).toFixed(1) + " dB(A) · " + (e.proyecto || "");
     mostrarAviso(texto, "grave");
     if (!S.alertas.sonido) return;
     pitido();
@@ -152,12 +153,13 @@
     pronostico: ["Pronóstico", "Tendencia por estación de monitoreo y riesgo de superar el límite"],
     penalidades: ["Penalidades", "Infracciones posibles y multas referenciales"],
     informes: ["Informes", "Informe técnico al instante, Excel y descargas"],
+    alertas: ["Alertas", "Avisos en tiempo real a los celulares y confirmación de lectura"],
     accesos: ["Accesos", "Cuentas, roles y proyectos asignados"],
     registro: ["Registro", "Auditoría: quién hizo qué y cuándo"],
   };
   const EN_BARRA = ["vivo", "mapa", "mediciones", "analisis"];
   function cambiarVista(v) {
-    if (!raiz.SON_VISTAS[v] || ((v === "accesos" || v === "registro") && S.rol !== "admin")) v = "vivo";
+    if (!raiz.SON_VISTAS[v] || ((v === "accesos" || v === "registro" || v === "alertas") && S.rol !== "admin")) v = "vivo";
     S.vista = v;
     document.querySelectorAll(".pestana").forEach((p) => p.setAttribute("aria-selected", p.dataset.vista === v ? "true" : "false"));
     document.querySelectorAll(".vista").forEach((s) => { s.hidden = s.id !== "vista-" + v; });
@@ -252,7 +254,7 @@
       S.hist.set(fila.id, h);
     }
     const lat = Number(fila.latitud), lon = Number(fila.longitud);
-    if (fila.midiendo && fila.latitud !== null && fila.latitud !== undefined && Number.isFinite(lat) && Number.isFinite(lon)) {
+    if ((fila.midiendo || fila.compartiendo) && fila.latitud !== null && fila.latitud !== undefined && Number.isFinite(lat) && Number.isFinite(lon)) {
       const r = S.rastro.get(fila.id) || [];
       const u = r[r.length - 1];
       if (!u || Math.abs(u[0] - lat) > 0.00002 || Math.abs(u[1] - lon) > 0.00002) r.push([lat, lon, Number(fila.nivel_dba), Date.now()]);
@@ -267,7 +269,7 @@
     if (S.eventos.some((x) => x.id === e.id)) return;
     S.eventos.unshift(e);
     if (S.eventos.length > 1500) S.eventos.length = 1500;
-    if (e.tipo === "ALERTA_OCUPACIONAL" || e.tipo === "ALERTA_ECA") alertar(e);
+    if (e.tipo === "ALERTA_OCUPACIONAL" || e.tipo === "ALERTA_ECA" || e.tipo === "ALERTA_VIVO") alertar(e);
     avisarVista("alEvento");
   }
 
