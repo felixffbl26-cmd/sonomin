@@ -55,13 +55,15 @@
     const midiendo = S.activos().includes(v), conectado = S.conectadoReciente(v);
     const nivel = Number(v.nivel_dba), sem = Number.isFinite(nivel) ? N.semaforo(nivel) : null;
     const recibido = S.vivoRecibido.get(v.id) || 0;
-    const estado = midiendo ? "Midiendo" : conectado ? "Conectado, sin medir" : "Sin señal " + (recibido ? U.hace(recibido) : (v.actualizado ? U.hace(Date.parse(v.actualizado)) : ""));
+    const estado = midiendo ? "Midiendo" : conectado ? (v.compartiendo ? "Compartiendo ubicación" : "Conectado, sin medir") : "Sin señal " + (recibido ? U.hace(recibido) : (v.actualizado ? U.hace(Date.parse(v.actualizado)) : ""));
     const dl = el("dl", { class: "datos-equipo" });
     const fila = (k, val) => { if (val !== null && val !== undefined && val !== "") dl.append(el("dt", { texto: k }), el("dd", { texto: String(val) })); };
     fila("Proyecto", v.proyecto);
     fila("Punto", v.punto);
     fila("Modo", (MODO[v.modo] || v.modo || "") + (v.ambito ? " · " + v.ambito.toLowerCase() : ""));
     fila("Evaluador", v.evaluador);
+    if (v.posicion_celular === "CUERPO") fila("Celular", "En el cuerpo: el nivel sale más bajo que el real");
+    else if (v.posicion_celular === "FIJO") fila("Celular", "Fijo en un punto");
     if (midiendo) {
       fila("Leq parcial", f1(Number(v.leq_parcial)) + " dB(A) · Lmax " + f1(Number(v.lmax_parcial)));
       fila("Tiempo", f0(Number(v.transcurrido_s)) + " s" + (Number(v.objetivo_s) > 0 ? " de " + f0(Number(v.objetivo_s)) + " s" : ""));
@@ -140,11 +142,11 @@
       const midiendo = S.activos().includes(v), ll = posEquipo(v);
       return {
         id: v.id, ll, color: colorEquipo(S, v.id), midiendo,
-        etiqueta: (v.dispositivo || "Celular") + (midiendo ? " · " + f0(Number(v.nivel_dba)) + " dB(A)" : " · sin medir") + (v.punto ? " · " + v.punto : ""),
+        etiqueta: (v.dispositivo || "Celular") + (midiendo ? " · " + f0(Number(v.nivel_dba)) + " dB(A)" : v.compartiendo ? " · ubicación compartida" : " · sin medir") + (v.punto ? " · " + v.punto : ""),
         rastro: (S.rastro.get(v.id) || []).filter((q) => q[3] >= Date.now() - 12 * 3600000).map((q) => [q[0], q[1]]),
         popup: () => el("div", { style: "min-width:200px" }, el("b", { texto: v.dispositivo || "Celular" }), el("br"),
           el("span", { texto: (v.proyecto || "") + " · " + (v.punto || "") }), el("br"),
-          el("span", { class: "mudo", texto: midiendo ? "Nivel " + f1(Number(v.nivel_dba)) + " dB(A) · Leq parcial " + f1(Number(v.leq_parcial)) : "No está midiendo" }), el("br"),
+          el("span", { class: "mudo", texto: midiendo ? "Nivel " + f1(Number(v.nivel_dba)) + " dB(A) · Leq parcial " + f1(Number(v.leq_parcial)) : v.compartiendo ? "Compartiendo su ubicación (no mide)" : "No está midiendo" }), el("br"),
           el("span", { class: "mudo", texto: ll ? ll[0].toFixed(6) + ", " + ll[1].toFixed(6) : "" })),
       };
     }));
@@ -179,7 +181,7 @@
   }
 
   // ----------------------------------------------------------- actividad
-  const TIPO = { INICIO: "Inicio", FIN: "Fin", MEDICION: "Medición", ALERTA_OCUPACIONAL: "≥ 85 dB(A)", ALERTA_ECA: "Sobre ECA" };
+  const TIPO = { INICIO: "Inicio", FIN: "Fin", MEDICION: "Medición", ALERTA_OCUPACIONAL: "≥ 85 dB(A)", ALERTA_ECA: "Sobre ECA", ALERTA_VIVO: "≥ 85 en vivo" };
   function pasaFiltro(e, S) {
     if (S.filtro.proyecto && e.proyecto !== S.filtro.proyecto) return false;
     if (filtroEv === "alertas") return /^ALERTA/.test(e.tipo);
